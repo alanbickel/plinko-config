@@ -17,6 +17,8 @@ export default defineConfig(({ command }) => ({
   },
   test: {
     root: '.',
+    setupFiles: './src/setupTests.ts',
+    // Unit tests only; e2e/ holds the Playwright suite (npm run test:e2e).
     include: ['src/**/*.test.ts'],
     environment: 'node',
   },

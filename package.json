@@ -43,7 +43,8 @@
     "test:watch": "vitest",
     "size": "size-limit",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build && npm run size",
-    "sim": "tsx scripts/simulate.ts"
+    "sim": "tsx scripts/simulate.ts",
+    "test:e2e": "playwright test"
   },
   "size-limit": [
     {
@@ -59,8 +60,10 @@
   ],
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
+    "@playwright/test": "^1.63.0",
     "@size-limit/preset-small-lib": "^14.1.0",
     "@types/node": "^22.20.4",
+    "jsdom": "^30.1.1",
     "size-limit": "^14.1.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

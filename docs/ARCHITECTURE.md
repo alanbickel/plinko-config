@@ -323,9 +323,10 @@ P8 (announce) also receives "picked up / dropped / cancelled" from P4 and "low /
 | Data | Shape | Producer → consumer |
 |---|---|---|
 | `Command` | `{type:'pickUp', kind} \| {type:'aim', x} \| {type:'nudge', dx} \| {type:'drop'} \| {type:'cancel'}` | Input / handle → state machine |
-| `ChipBody` | `{ id, kindId, dropX, seed, rng, pos, vel, pegHits, ageSteps, stillSteps, nudges, onPile, outcome?, slotIndex? }` | World ↔ board state |
+| `ChipBody` | `{ id, kindId, dropX, seed, rng, pos, prevPos, vel, pegHits, ageSteps, stillSteps, stillFrom, nudges, onPile, outcome?, slotIndex? }` | World ↔ board state |
 | `WorldEvent` | `{type:'pegHit', chip, pegIndex, speed} \| {type:'landed', chip, slotIndex} \| {type:'missed', chip} \| {type:'full', reason:'slots'\|'overflow'}` | World → controller |
-| `Landing` | `{ chip, slot, details: { dropId, dropX, pegHits, durationMs, seed } }` | Controller → host, announcer |
+| Outcome callbacks | `onLand(chip, slot, details)` · `onMiss(chip, details)` · `onFull({ reason })`; `details = { dropId, dropX, pegHits, durationMs, seed }` | Controller → host, announcer |
+| `Settled` | `{ dropId }`: what `drop()` resolves with. Only "no longer in flight"; callbacks are the single source of outcomes. | Controller → host |
 | `SupplyState` | `{ v:1, counts, lastRefillAt? }` | Supply ↔ storage |
 
 **Trust boundaries**
@@ -360,6 +361,8 @@ flowchart TB
         Dropping -- "commit + spawn" --> reload{"reload?"}:::choice
         reload -- "autoReload and reserve ok" --> Holding
         reload -- "otherwise" --> Idle
+        Idle -- "board full" --> Locked(["Locked"]):::state
+        Holding -- "board full<br/>(chip back to tray)" --> Locked
     end
 
     classDef start fill:#e6edf3,stroke:#e6edf3,color:#0d1117
@@ -376,9 +379,10 @@ flowchart TB
 | `Holding → Idle` (cancel) | `Esc`, or pointer released off the board. `supply.release`. Keyboard zone returns to the tray. |
 | `Holding → Dropping` | Only if `inFlight < maxInFlight`; otherwise stay in `Holding` and announce "wait." |
 | `Dropping → …` | Commit the reservation, spawn the chip in the world, fire `onDrop`. With `autoReload`, reserve the next chip of the same kind at the same x. |
-| any → destroyed | `destroy()`: release any reservation, flush saves, tear down. |
+| `Idle` / `Holding` → `Locked` | The world reports `full`. A held chip goes back to the tray (`supply.release`). Pending landings are announced, then the lock message. Every later command is refused; `drop()` rejects. In-flight chips finish normally. |
+| any → destroyed | `destroy()`: release any reservation, flush saves, tear down. Pending `drop()` promises resolve, since their chips are gone. |
 
-The canvas is a single tab stop. Inside it, a *keyboard zone* (tray or board) is tracked separately from this machine. It only decides how keys are interpreted: tray keys select a kind and produce `pickUp`, and board keys produce `aim`/`nudge`/`drop`/`cancel`.
+The canvas is a single tab stop. Inside it, a *keyboard zone* (tray or board) is tracked separately from this machine. It only decides how keys are interpreted: tray keys select a kind and produce `pickUp`, and board keys produce `aim`/`nudge`/`drop`/`cancel`. Tab and modified keys are never handled, so focus can always leave. Nudge sizes are `aimStep` / `aimStepLarge` (fractions of the drop width; defaults ¼ slot and 1 slot). The wrapper exposes the current state and zone as `data-state` / `data-zone`.
 
 **Invariants**
 
@@ -420,7 +424,8 @@ flowchart LR
 
 - **The layout is jam-free.** Every row leaves either a chip-sized gap or none. A peg too close to a wall for a chip to pass becomes a half-round bump set into the wall, which also stops chips sliding straight down the walls. Slot dividers are rails with rounded tops.
 - **Round things are unstable to rest on.** A chip resting on a peg, rail cap, wall bump, or piled chip gets a small push away from its centre, so it rolls off. Nudging a still chip is only a safety net; a chip deliberately stuck on a peg is a planned prank, never a physics side effect.
-- **A landing is a real slot result.** A chip counts as *landed* when it is at rest with any part below the rail tops; the slot comes from its x position, so a chip that rolls off an overflowing pile reports the slot it actually ends up in. Anything else that settles (on a pile above the rails, or the 60 s failsafe) is a *miss*: it uses up the chip but never fires `onLand`, so hosts never filter landings.
+- **"Still" means staying put, not moving slowly.** A chip is still once it stays within a small radius for a while, however much it jitters. Speed alone isn't enough: stacks of chips in rapid fire shove each other every step. A chip still stuck after three nudges settles as a miss.
+- **A landing is a real slot result.** A chip counts as *landed* when it is at rest with any part below the rail tops; the slot comes from its x position, so a chip that rolls off an overflowing pile reports the slot it actually ends up in. Anything else that settles (on a pile above the rails, out of nudges, or the 60 s failsafe) is a *miss*: it uses up the chip but never fires `onLand`, so hosts never filter landings.
 - **Settled chips pile up, forever.** Landed and missed chips freeze as static colliders, and later chips stack on them. Piles are only cleared by `destroy()`. When a pile rises above its rails, new chips roll over into the neighbouring slots.
 - **The board fills up.** The world emits `full` once: `slots` when every slot's pile reaches the rail tops, or `overflow` when a chip settles with any part at or above the drop line. The board then locks: no more drops, and a message that no more changes can be made.
 
@@ -464,6 +469,8 @@ sequenceDiagram
 
 
 `createPlinko` returns synchronously even when the storage adapter is async, so host code stays simple. Readiness shows up through the tray and `onSupplyChange`.
+
+**Sizing.** The board fills the host's width. If the host has a height of its own, the board also fits inside it, centred. To tell the two apart, the board collapses its canvas for a moment and measures what height the host keeps. Both the wrapper and the host are observed, so the board refits whenever either changes.
 
 ---
 

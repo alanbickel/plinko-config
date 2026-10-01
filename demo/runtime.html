@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>plinko-config: runtime debug</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0e13;
+        --panel: #1a2029;
+        --text: #e6e9ee;
+        --muted: #a3adbb;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 1rem;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.4 system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 1.1rem;
+        margin: 0 0 0.75rem;
+      }
+      a {
+        color: #7cc4ff;
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+        gap: 1rem;
+        align-items: start;
+      }
+      /* A host with its own height: the board fits inside it (width and height). */
+      #host {
+        height: calc(100vh - 7rem);
+      }
+      aside {
+        display: grid;
+        gap: 0.75rem;
+        min-width: 0;
+      }
+      section {
+        background: var(--panel);
+        border-radius: 6px;
+        padding: 0.6rem 0.75rem;
+        min-width: 0;
+      }
+      h2 {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin: 0 0 0.4rem;
+      }
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+      button {
+        background: #2c3440;
+        color: var(--text);
+        border: 1px solid #3b4553;
+        border-radius: 4px;
+        padding: 0.3rem 0.6rem;
+        cursor: pointer;
+      }
+      label {
+        display: inline-flex;
+        gap: 0.3rem;
+        align-items: center;
+        margin-right: 0.75rem;
+      }
+      input[type='number'] {
+        width: 4.5rem;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0.15rem 0.75rem;
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      dt {
+        color: var(--muted);
+      }
+      dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      ol {
+        margin: 0;
+        padding-left: 1.4rem;
+        max-height: 14rem;
+        overflow: auto;
+        font: 12px/1.45 ui-monospace, monospace;
+      }
+      li {
+        overflow-wrap: anywhere;
+      }
+      .tag {
+        color: #ffd166;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>plinko-config · runtime debug</h1>
+    <main>
+      <div>
+        <p>
+          <a href="#host" id="skip">Focus the board</a> · Tab in, then: ←/→ choose, Enter pick up,
+          ←/→ aim (Shift = faster), Home/End, Enter/↓ drop, Esc put back. Tab leaves.
+        </p>
+        <div id="host"></div>
+      </div>
+      <aside>
+        <section>
+          <h2>Handle</h2>
+          <div class="buttons">
+            <button type="button" data-call="pickUp">pickUp(selected)</button>
+            <button type="button" data-call="aim">aim(random)</button>
+            <button type="button" data-call="drop">drop()</button>
+            <button type="button" data-call="burst">drop × 20</button>
+            <button type="button" data-call="cancel">cancel()</button>
+            <button type="button" data-call="pause">pause()</button>
+            <button type="button" data-call="resume">resume()</button>
+            <button type="button" data-call="destroy">destroy()</button>
+            <button type="button" data-call="mount">mount</button>
+          </div>
+        </section>
+        <section>
+          <h2>Options (remount)</h2>
+          <label><input type="checkbox" id="autoReload" checked /> autoReload</label>
+          <label><input type="checkbox" id="attribution" checked /> attribution</label>
+          <label>seed <input type="number" id="seed" value="1" /></label>
+          <label>slots <input type="number" id="slots" value="5" min="1" max="12" /></label>
+          <label>aimStep <input type="number" id="aimStep" step="0.005" min="0.001" max="1" placeholder="auto" /></label>
+          <label>aimStepLarge <input type="number" id="aimStepLarge" step="0.01" min="0.001" max="1" placeholder="auto" /></label>
+        </section>
+        <section>
+          <h2>State</h2>
+          <dl id="state"></dl>
+        </section>
+        <section>
+          <h2>Announcements (what a screen reader hears)</h2>
+          <ol id="transcript"></ol>
+        </section>
+        <section>
+          <h2>Callbacks</h2>
+          <ol id="log"></ol>
+        </section>
+      </aside>
+    </main>
+    <script type="module" src="./runtime.ts"></script>
+  </body>
+</html>
