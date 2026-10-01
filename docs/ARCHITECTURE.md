@@ -182,7 +182,7 @@ flowchart TB
         cmds -- "spawn" --> world
         cmds -- "reserve / commit / release" --> supply
         loop -- "step × n" --> world
-        world -. "pegHit, landed" .-> board
+        world -. "pegHit, landed, missed, full" .-> board
         supply -. "onSupplyChange" .-> board
         world --> rng
         world --> vendor
@@ -284,7 +284,7 @@ flowchart TB
         D4[("D4 · Supply state")]:::store
 
         P5(["5 · Simulate<br/>fixed 120 Hz steps"]):::proc
-        P6(["6 · Detect landing"]):::proc
+        P6(["6 · Detect landing<br/>or miss"]):::proc
         P7(["7 · Render"]):::proc
         P8(["8 · Announce"]):::proc
 
@@ -298,9 +298,9 @@ flowchart TB
 
         D3 --> P6
         D2 -- "slot bounds" --> P6
-        P6 -- "freeze chip into slot pile" --> D3
-        P6 -- "onLand(chip, slot, details)" --> H
-        P6 -- "landed" --> P8
+        P6 -- "freeze chip into pile" --> D3
+        P6 -- "onLand (valid landing only)<br/>onMiss" --> H
+        P6 -- "landed / missed / full" --> P8
 
         D2 --> P7
         D3 -- "bodies, held chip" --> P7
@@ -323,8 +323,8 @@ P8 (announce) also receives "picked up / dropped / cancelled" from P4 and "low /
 | Data | Shape | Producer → consumer |
 |---|---|---|
 | `Command` | `{type:'pickUp', kind} \| {type:'aim', x} \| {type:'nudge', dx} \| {type:'drop'} \| {type:'cancel'}` | Input / handle → state machine |
-| `ChipBody` | `{ id, dropId, kindId, pos, vel, rng, pegHits, bornAt, restSteps }` | World ↔ board state |
-| `WorldEvent` | `{type:'pegHit', chipId, pegIndex} \| {type:'landed', chipId, slotIndex}` | World → controller |
+| `ChipBody` | `{ id, kindId, dropX, seed, rng, pos, vel, pegHits, ageSteps, stillSteps, nudges, onPile, outcome?, slotIndex? }` | World ↔ board state |
+| `WorldEvent` | `{type:'pegHit', chip, pegIndex, speed} \| {type:'landed', chip, slotIndex} \| {type:'missed', chip} \| {type:'full', reason:'slots'\|'overflow'}` | World → controller |
 | `Landing` | `{ chip, slot, details: { dropId, dropX, pegHits, durationMs, seed } }` | Controller → host, announcer |
 | `SupplyState` | `{ v:1, counts, lastRefillAt? }` | Supply ↔ storage |
 
@@ -405,9 +405,11 @@ flowchart LR
         InTray -- "pickUp" --> Reserved(["Reserved"]):::state
         Reserved -- "cancel (release)" --> InTray
         Reserved -- "drop (commit, spawn)" --> InFlight(["In flight"]):::state
-        InFlight -- "step: gravity, collisions,<br/>pegHit, stuck nudge" --> InFlight
-        InFlight -- "at rest on floor,<br/>rails, or pile" --> Landed(["Landed"]):::state
+        InFlight -- "step: gravity, collisions,<br/>pegHit, safety-net nudge" --> InFlight
+        InFlight -- "at rest, partly<br/>below rail tops" --> Landed(["Landed"]):::state
+        InFlight -- "at rest on pile above rails,<br/>or 60 s failsafe" --> Missed(["Missed"]):::state
         Landed -- "onLand fired,<br/>frozen as static collider" --> Resting(["Resting in pile"]):::state
+        Missed -- "onMiss fired (no onLand),<br/>frozen as static collider" --> Resting
         Resting -- "destroy()" --> done(((" "))):::start
     end
 
@@ -416,9 +418,11 @@ flowchart LR
     style canvas fill:#161b22,stroke:#161b22
 ```
 
-- **Slot dividers are rails**: static colliders with rounded tops, so chips roll off instead of balancing on them.
-- **Landed chips pile up, forever.** A landed chip is frozen as a static collider, and later chips stack on it. Piles are only cleared by `destroy()`. When a pile rises above its rails, new chips roll over into the neighbouring slots.
-- **The slot is decided at rest**, by the chip's x position, so a chip that rolls off an overflowing pile lands in (and reports) the slot it actually ends up in.
+- **The layout is jam-free.** Every row leaves either a chip-sized gap or none. A peg too close to a wall for a chip to pass becomes a half-round bump set into the wall, which also stops chips sliding straight down the walls. Slot dividers are rails with rounded tops.
+- **Round things are unstable to rest on.** A chip resting on a peg, rail cap, wall bump, or piled chip gets a small push away from its centre, so it rolls off. Nudging a still chip is only a safety net; a chip deliberately stuck on a peg is a planned prank, never a physics side effect.
+- **A landing is a real slot result.** A chip counts as *landed* when it is at rest with any part below the rail tops; the slot comes from its x position, so a chip that rolls off an overflowing pile reports the slot it actually ends up in. Anything else that settles (on a pile above the rails, or the 60 s failsafe) is a *miss*: it uses up the chip but never fires `onLand`, so hosts never filter landings.
+- **Settled chips pile up, forever.** Landed and missed chips freeze as static colliders, and later chips stack on them. Piles are only cleared by `destroy()`. When a pile rises above its rails, new chips roll over into the neighbouring slots.
+- **The board fills up.** The world emits `full` once: `slots` when every slot's pile reaches the rail tops, or `overflow` when a chip settles with any part at or above the drop line. The board then locks: no more drops, and a message that no more changes can be made.
 
 ---
 
@@ -531,7 +535,7 @@ flowchart TB
         acc --> step{"acc ≥ 1/120 s?"}:::choice
         step -- yes --> sim["world.step(1/120)<br/>collect events<br/>acc -= 1/120"]:::step
         sim --> step
-        step -- no --> ev["dispatch collected events:<br/>pegHit, landed → callbacks + announcer"]:::step
+        step -- no --> ev["dispatch collected events:<br/>pegHit, landed, missed, full →<br/>callbacks + announcer"]:::step
         ev --> draw["canvas.render(state, alpha = acc / dt)<br/>interpolate positions"]:::step
         draw --> idle{"anything held<br/>or in flight?"}:::choice
         idle -- yes --> start

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>plinko-config: physics debug</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #11151c;
+        --panel: #1a2029;
+        --text: #e6e9ee;
+        --muted: #9aa4b2;
+      }
+      body {
+        margin: 0;
+        padding: 1rem;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.4 system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 1.1rem;
+        margin: 0 0 0.75rem;
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 18rem;
+        gap: 1rem;
+        align-items: start;
+      }
+      canvas {
+        display: block;
+        margin: 0 auto;
+        cursor: crosshair;
+        border-radius: 6px;
+      }
+      aside {
+        background: var(--panel);
+        border-radius: 6px;
+        padding: 0.75rem;
+        display: grid;
+        gap: 0.75rem;
+      }
+      fieldset {
+        border: 1px solid #2c3440;
+        border-radius: 4px;
+        margin: 0;
+        padding: 0.5rem;
+        display: grid;
+        gap: 0.35rem;
+      }
+      legend {
+        color: var(--muted);
+        padding: 0 0.25rem;
+      }
+      label {
+        display: grid;
+        grid-template-columns: 6.5rem 1fr 3rem;
+        align-items: center;
+        gap: 0.4rem;
+      }
+      label.check {
+        grid-template-columns: auto 1fr;
+      }
+      output {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+      button {
+        background: #2c3440;
+        color: var(--text);
+        border: 1px solid #3b4553;
+        border-radius: 4px;
+        padding: 0.3rem 0.6rem;
+        cursor: pointer;
+      }
+      button[aria-pressed='true'] {
+        background: #3d6fd9;
+      }
+      #stats {
+        font-variant-numeric: tabular-nums;
+        white-space: pre-line;
+        color: var(--muted);
+      }
+      #error {
+        color: #ff8a80;
+      }
+      #error:empty {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>plinko-config · physics debug <small>(click the board to drop)</small></h1>
+    <main>
+      <div id="stage"><canvas id="board"></canvas></div>
+      <aside>
+        <div class="buttons">
+          <button id="drop10" type="button">Drop 10</button>
+          <button id="drop100" type="button">Drop 100 centre</button>
+          <button id="auto" type="button" aria-pressed="false">Auto-drop</button>
+          <button id="reset" type="button">Reset</button>
+        </div>
+        <fieldset id="physics"><legend>Physics (live)</legend></fieldset>
+        <fieldset id="geometry"><legend>Board (resets)</legend></fieldset>
+        <fieldset id="sim"><legend>Simulation</legend></fieldset>
+        <div id="error" role="alert"></div>
+        <div id="stats" aria-live="polite"></div>
+      </aside>
+    </main>
+    <script type="module" src="./debug.ts"></script>
+  </body>
+</html>
