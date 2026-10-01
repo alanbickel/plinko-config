@@ -1,0 +1,7 @@
+# local working notes (not committed)
+NOTES.md
+
+# dependencies and build output
+node_modules/
+dist/
+coverage/
