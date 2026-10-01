@@ -189,6 +189,30 @@ describe('World: piles and full board', () => {
 });
 
 describe('World: rapid fire', () => {
+  // Regression: holding Enter at one spot stacks in-flight chips into the pegs. Stillness used to
+  // be judged by speed, so jittering chips never settled and ran to the 60 s failsafe.
+  it.each([
+    [5, 0.484],
+    [5, 0.1],
+    [7, 0.5],
+  ])('settles a held-down burst promptly (%i slots, x=%f)', (slots, x) => {
+    const world = makeWorld({ slots });
+    const ages: number[] = [];
+    let spawned = 0;
+    for (let step = 0; (spawned < 80 || world.flying.length > 0) && step < 120 / STEP; step++) {
+      if (spawned < 80 && step % 12 === 0) {
+        world.spawn('chip', x);
+        spawned++;
+      }
+      for (const e of world.step()) {
+        if (e.type === 'landed' || e.type === 'missed') ages.push(e.chip.ageSteps * STEP);
+      }
+    }
+    expect(ages).toHaveLength(80);
+    expect(Math.max(...ages)).toBeLessThan(8);
+    expect(world.full).toBe('slots');
+  });
+
   it('handles 100 chips in flight at once', () => {
     const world = makeWorld();
     for (const x of positions(100)) world.spawn('chip', x);

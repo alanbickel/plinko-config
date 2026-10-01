@@ -6,16 +6,22 @@ import { collideCircleBox, collideCircleCircle, type Vector2, vec2 } from './ven
 /** Fixed simulation step, seconds. Seeded drops reproduce because this never changes. */
 export const STEP = 1 / 120;
 
-/** Below this speed (units/s) a chip counts as still. */
-const REST_SPEED = 0.5;
-/** Still this long below the pegs, or on top of the pile → landed. */
+/**
+ * A chip that stays within this distance of where it started being still counts as still.
+ * Measured by displacement, not speed, so a chip jittering in a jam (contacts shoving it back
+ * and forth every step) still counts as still.
+ */
+const STILL_RADIUS = 0.03;
+/** Still this long in a slot, or on top of the pile → settled. */
 const REST_STEPS = 24;
 /**
  * Still this long anywhere else → stuck, gets nudged. Layout keeps physics jam-free, so this is
  * only a safety net; deliberately stuck chips are a planned prank, not a physics side effect.
  */
 const STUCK_STEPS = 90;
-/** Failsafe: any chip still flying after this many steps lands where it is. */
+/** A chip still stuck after this many nudges settles as a miss (e.g. piles jammed into pegs). */
+const MAX_NUDGES = 3;
+/** Failsafe: any chip still flying after this many steps settles as a miss. */
 const MAX_AGE_STEPS = 60 / STEP;
 /** Impacts slower than this (units/s) are contact, not hits: no event, no jitter. */
 const HIT_SPEED = 1;
@@ -32,10 +38,14 @@ export interface ChipBody {
   readonly seed: number;
   readonly rng: Rng;
   pos: Vector2;
+  /** Position before the latest step, so renderers can interpolate between steps. */
+  prevPos: Vector2;
   vel: Vector2;
   pegHits: number;
   ageSteps: number;
+  /** Steps spent within STILL_RADIUS of stillFrom. */
   stillSteps: number;
+  stillFrom: Vector2;
   nudges: number;
   /** Resting on a landed chip this step. */
   onPile: boolean;
@@ -106,17 +116,20 @@ export class World {
   spawn(kindId: string, x: number, seed?: number): ChipBody {
     const id = this.nextId++;
     const chipSeed = seed ?? hashSeed(this.physics.seed, id);
+    const pos = vec2(dropXToBoard(this.layout, x), this.layout.spawnY);
     const chip: ChipBody = {
       id,
       kindId,
       dropX: x,
       seed: chipSeed,
       rng: createRng(chipSeed),
-      pos: vec2(dropXToBoard(this.layout, x), this.layout.spawnY),
+      pos,
+      prevPos: pos,
       vel: vec2(0, 0),
       pegHits: 0,
       ageSteps: 0,
       stillSteps: 0,
+      stillFrom: pos,
       nudges: 0,
       onPile: false,
     };
@@ -127,6 +140,7 @@ export class World {
   /** Advances the simulation by one STEP and returns what happened. */
   step(): WorldEvent[] {
     const events: WorldEvent[] = [];
+    for (const chip of this.flying) chip.prevPos = chip.pos;
     for (const chip of this.flying) this.integrate(chip);
     for (const chip of this.flying) this.collideStatic(chip, events);
     if (this.physics.chipCollisions) this.collideChips();
@@ -220,7 +234,12 @@ export class World {
   }
 
   private updateRest(chip: ChipBody, events: WorldEvent[]): void {
-    chip.stillSteps = chip.vel.length() < REST_SPEED ? chip.stillSteps + 1 : 0;
+    if (chip.pos.distanceSquared(chip.stillFrom) > STILL_RADIUS ** 2) {
+      chip.stillFrom = chip.pos;
+      chip.stillSteps = 0;
+    } else {
+      chip.stillSteps++;
+    }
     const inSlot = chip.pos.y + this.layout.chipRadius > this.layout.railTopY;
 
     // Still anywhere else (on a peg, a rail cap, a wall) is a jam and falls through to a nudge.
@@ -228,7 +247,8 @@ export class World {
       this.settle(chip, inSlot, events);
       return;
     }
-    if (chip.ageSteps >= MAX_AGE_STEPS) {
+    const outOfNudges = chip.stillSteps >= STUCK_STEPS && chip.nudges >= MAX_NUDGES;
+    if (outOfNudges || chip.ageSteps >= MAX_AGE_STEPS) {
       this.settle(chip, false, events);
       return;
     }
@@ -242,6 +262,7 @@ export class World {
   /** Freezes a chip into the pile and reports a landing (inSlot) or a miss. */
   private settle(chip: ChipBody, inSlot: boolean, events: WorldEvent[]): void {
     chip.vel = vec2(0, 0);
+    chip.prevPos = chip.pos;
     this.flying.splice(this.flying.indexOf(chip), 1);
     if (inSlot) {
       const slotIndex = slotIndexAt(this.layout, chip.pos.x);
