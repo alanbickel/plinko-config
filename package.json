@@ -1,0 +1,67 @@
+{
+  "name": "plinko-config",
+  "version": "0.0.0",
+  "description": "Set user preferences by playing Plinko. A deliberately terrible UI component.",
+  "keywords": [
+    "plinko",
+    "preferences",
+    "settings",
+    "ui",
+    "joke",
+    "web-component",
+    "canvas"
+  ],
+  "license": "MIT-0",
+  "type": "module",
+  "sideEffects": [
+    "./dist/element.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./element": {
+      "types": "./dist/element.d.ts",
+      "import": "./dist/element.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "size": "size-limit",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build && npm run size"
+  },
+  "size-limit": [
+    {
+      "name": "plinko-config",
+      "path": "dist/index.js",
+      "limit": "12 kB"
+    },
+    {
+      "name": "plinko-config/element",
+      "path": "dist/element.js",
+      "limit": "13 kB"
+    }
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@size-limit/preset-small-lib": "^14.1.0",
+    "size-limit": "^14.1.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  }
+}
