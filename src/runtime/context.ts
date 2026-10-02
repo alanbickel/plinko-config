@@ -39,8 +39,10 @@ export interface UiState {
 export interface BoardContext {
   host: HTMLElement;
   win: Window | null;
-  /** The visitor asked for less motion: no animated scrolling or flashes. */
+  /** Less motion right now (the motion option, or the visitor's setting): see motion.ts. */
   reducedMotion: boolean;
+  /** The visitor's prefers-reduced-motion query, followed live for motion: 'auto'. */
+  motionQuery: MediaQueryList | undefined;
   /** The host's options, including its (untrusted) callbacks. */
   options: PlinkoOptions;
   config: RuntimeConfig;

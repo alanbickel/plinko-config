@@ -42,6 +42,7 @@ export type {
   FullReason,
   LandDetails,
   MissDetails,
+  MotionPreference,
   MountOnlyOption,
   PegHitDetails,
   PlinkoBoard,

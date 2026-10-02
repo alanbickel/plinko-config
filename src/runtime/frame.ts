@@ -1,5 +1,6 @@
 // The frame loop's callbacks: step the world, dispatch its events, draw.
 
+import { STEP } from '../core/world';
 import { type BoardContext, heldChip, zoneOf } from './context';
 import { FrameLoop } from './loop';
 import { type DropZoneLook, type FrameState, type HeldChip, PEG_FLASH_MS } from './view/canvas';
@@ -13,12 +14,27 @@ export function createLoop(ctx: BoardContext): FrameLoop {
       ctx.events.push(...ctx.world.step());
     },
     render: (alpha) => {
+      if (ctx.reducedMotion) settleNow(ctx);
       dispatchWorldEvents(ctx, handlers); // after stepping, never mid-step (ARCHITECTURE.md §9)
       ctx.view.render(frameState(ctx, alpha));
     },
     active: () => isAnimating(ctx),
   });
 }
+
+/**
+ * Reduced motion: chips in flight go straight to where they come to rest. Same fixed steps as the
+ * animated fall, so a seeded drop lands in the same slot either way. It runs a frame after the
+ * drop, never inside drop() itself, so onDrop and the drop() promise are set up before onLand.
+ */
+function settleNow({ world, events }: BoardContext): void {
+  for (let i = 0; i < MAX_INSTANT_STEPS && world.flying.length > 0; i++) {
+    events.push(...world.step());
+  }
+}
+
+/** Past the world's own 60 s failsafe, so this bound never cuts a fall short. */
+const MAX_INSTANT_STEPS = Math.ceil(90 / STEP);
 
 function frameState(ctx: BoardContext, alpha: number): FrameState {
   const { world, ui, chips } = ctx;

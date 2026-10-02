@@ -579,6 +579,83 @@ describe('styles', () => {
   });
 });
 
+describe('motion', () => {
+  /** A stand-in for the visitor's reduced-motion setting that can change while the board runs. */
+  function fakeReducedMotionQuery(matches: boolean) {
+    const listeners = new Set<() => void>();
+    const query = {
+      matches,
+      addEventListener: (_: string, fn: () => void) => listeners.add(fn),
+      removeEventListener: (_: string, fn: () => void) => listeners.delete(fn),
+    };
+    window.matchMedia = (() => query) as unknown as typeof window.matchMedia;
+    return {
+      change(next: boolean) {
+        query.matches = next;
+        for (const fn of listeners) fn();
+      },
+      listeners,
+    };
+  }
+  afterEach(() => {
+    Reflect.deleteProperty(window, 'matchMedia');
+  });
+
+  it('reduced: a dropped chip settles on the next frame, not after the fall', () => {
+    const settled = vi.fn();
+    const b = mount({ motion: 'reduced', onLand: settled, onMiss: settled });
+    void b.drop({ chip: 'on', x: 0.5 });
+    expect(settled).not.toHaveBeenCalled(); // never inside drop() itself
+    run(20); // one frame
+    expect(settled).toHaveBeenCalledOnce();
+  });
+
+  it('full: the same drop is still falling a frame later', () => {
+    const settled = vi.fn();
+    const b = mount({ motion: 'full', onLand: settled, onMiss: settled });
+    void b.drop({ chip: 'on', x: 0.5 });
+    run(20);
+    expect(settled).not.toHaveBeenCalled();
+  });
+
+  it('lands a seeded drop in the same slot either way', () => {
+    const slotWith = (motion: 'full' | 'reduced') => {
+      const onLand = vi.fn();
+      const b = mount({ motion, onLand });
+      void b.drop({ chip: 'on', x: 0.37, seed: 42 });
+      run(20_000);
+      const slot = (onLand.mock.calls[0]?.[0] as { slot: { id: string } } | undefined)?.slot.id;
+      b.destroy();
+      return slot;
+    };
+    const animated = slotWith('full');
+    expect(animated).toBeDefined(); // it really landed, so the comparison means something
+    expect(slotWith('reduced')).toBe(animated);
+  });
+
+  it("'auto' follows the visitor's setting, live, and stops following on destroy", () => {
+    const visitor = fakeReducedMotionQuery(false);
+    const settled = vi.fn();
+    const b = mount({ onLand: settled, onMiss: settled });
+    visitor.change(true);
+    void b.drop({ chip: 'on' });
+    run(20);
+    expect(settled).toHaveBeenCalledOnce();
+    b.destroy();
+    expect(visitor.listeners.size).toBe(0);
+  });
+
+  it('can change with update(), and rejects unknown values', () => {
+    const settled = vi.fn();
+    const b = mount({ onLand: settled, onMiss: settled });
+    b.update({ motion: 'reduced' });
+    void b.drop({ chip: 'on' });
+    run(20);
+    expect(settled).toHaveBeenCalledOnce();
+    expect(() => b.update({ motion: 'slow' as 'full' })).toThrow(/motion must be/);
+  });
+});
+
 describe('destroy', () => {
   it('removes everything and leaves the host as it was', () => {
     const b = mount();

@@ -73,6 +73,13 @@ export interface Settled {
 }
 
 /**
+ * How much the board moves. `'auto'` follows the visitor's prefers-reduced-motion setting, live.
+ * `'reduced'`: dropped chips appear where they come to rest, without the fall; no peg flashes;
+ * lost chips fade instead of falling. `'full'`: always animate.
+ */
+export type MotionPreference = 'auto' | 'full' | 'reduced';
+
+/**
  * Everything `createPlinko()` accepts. Only `slots` and `chips` are required. `CV` and `SV` are
  * the types of your chip and slot `value`s; they flow through to every callback.
  *
@@ -80,6 +87,11 @@ export interface Settled {
  * {@link MountOnlyOption}.
  */
 export interface PlinkoOptions<CV = unknown, SV = unknown> extends CoreOptions<CV, SV> {
+  /**
+   * How much the board moves; see {@link MotionPreference}. Default `'auto'`, which follows the
+   * visitor's reduced-motion setting and reacts when it changes. Can change with update().
+   */
+  motion?: MotionPreference;
   /** Chips allowed in flight at once. Default Infinity. */
   maxInFlight?: number;
   /**

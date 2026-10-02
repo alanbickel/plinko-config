@@ -5,6 +5,7 @@ import { check } from '../core/validate';
 import { resolveRuntimeConfig } from './config';
 import { type BoardContext, refresh } from './context';
 import { resolveLook } from './look';
+import { applyMotion } from './motion';
 import type { BoardUpdate, MountOnlyOption, PlinkoOptions } from './types';
 import { applyLabels } from './view/dom';
 
@@ -33,5 +34,6 @@ export function updateBoard(ctx: BoardContext, update: BoardUpdate): void {
   ctx.announcer.setLabels(config.labels);
   applyLabels(ctx.dom, config.labels);
   ctx.view.setLook(look);
+  applyMotion(ctx);
   refresh(ctx);
 }

@@ -10,9 +10,10 @@ import { type BoardContext, initialUiState, refresh } from './context';
 import { dispatchByType } from './dispatch';
 import { createLoop } from './frame';
 import { resolveLook } from './look';
+import { isReduced, motionQuery } from './motion';
 import { noticeHandlers } from './notices';
 import { supplyChanged } from './supply';
-import type { PlinkoOptions } from './types';
+import type { MotionPreference, PlinkoOptions } from './types';
 import { Announcer } from './view/a11y';
 import { CanvasView } from './view/canvas';
 import { createDom } from './view/dom';
@@ -43,11 +44,11 @@ function createBase({ host, options }: AssembleInput): BaseContext {
   const win = host.ownerDocument.defaultView;
   const dom = createDom({ host, labels: config.labels, attribution: config.attribution });
   const look = resolveLook({ options, host, win });
-  const reducedMotion = prefersReducedMotion(win);
+  const motion = motionState({ preference: config.motion, win });
   return {
     host,
     win,
-    reducedMotion,
+    ...motion,
     options,
     config,
     slots,
@@ -63,11 +64,24 @@ function createBase({ host, options }: AssembleInput): BaseContext {
       kinds: chips,
       slots,
       ...look,
-      reducedMotion,
+      reducedMotion: motion.reducedMotion,
     }),
     announcer: new Announcer({ live: dom.live, labels: config.labels }),
     ...emptyState(),
   };
+}
+
+interface MotionStateInput {
+  preference: MotionPreference;
+  win: Window | null;
+}
+
+function motionState({
+  preference,
+  win,
+}: MotionStateInput): Pick<BoardContext, 'reducedMotion' | 'motionQuery'> {
+  const query = motionQuery(win);
+  return { reducedMotion: isReduced({ preference, query }), motionQuery: query };
 }
 
 /** What a new board starts with: nothing pending, nothing settling, default UI state. */
@@ -104,7 +118,3 @@ const CHANGES_SUPPLY: ReadonlySet<keyof NoticeByType> = new Set<keyof NoticeByTy
   'lost',
   'locked',
 ]);
-
-function prefersReducedMotion(win: Window | null): boolean {
-  return win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-}

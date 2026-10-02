@@ -119,3 +119,12 @@ test('destroy() leaves nothing behind', async ({ page }) => {
   await expect(page.locator('#host')).toBeEmpty();
   await expect(page.locator('#log')).toContainText('"leftoverNodesInHost":0');
 });
+
+test('with reduced motion, a dropped chip settles at once instead of falling', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/runtime.html');
+  await expect(page.locator('#host canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'drop()', exact: true }).click();
+  // A fall takes seconds; settling at once lands within a frame or two.
+  await expect(page.locator('#log')).toContainText(/onLand|onMiss/, { timeout: 500 });
+});

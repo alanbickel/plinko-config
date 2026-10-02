@@ -156,6 +156,12 @@ export class CanvasView {
     this.painter?.setLook(look);
   }
 
+  /** Peg flashes and falling lost chips follow this from the next frame on. */
+  setReducedMotion(reducedMotion: boolean): void {
+    this.input = { ...this.input, reducedMotion };
+    this.painter?.setReducedMotion(reducedMotion);
+  }
+
   /** What's under a point, or null outside the canvas. */
   hitTest(css: CssPoint): Hit | null {
     const { layout, kinds } = this.input;
@@ -180,6 +186,10 @@ class Painter {
 
   constructor(private input: PainterInput) {
     this.setLook(input);
+  }
+
+  setReducedMotion(reducedMotion: boolean): void {
+    this.input = { ...this.input, reducedMotion };
   }
 
   setLook({ theme, styles }: Look): void {
