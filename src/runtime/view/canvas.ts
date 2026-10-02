@@ -5,7 +5,7 @@ import { boardToDropX, type Circle, dropXToBoard, type Layout } from '../../core
 import type { ChipKindConfig, SlotConfig } from '../../core/types';
 import type { ChipBody } from '../../core/world';
 import type { Zone } from '../input/actions';
-import { type ResolvedChipStyle, type ResolvedStyles, type ResolvedText } from '../styles';
+import type { ResolvedChipStyle, ResolvedStyles, ResolvedText } from '../styles';
 import type { Theme } from '../theme';
 import {
   type BoardPoint,
