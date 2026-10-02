@@ -2,7 +2,12 @@
 // The playground view. Logic lives in config.ts, board.ts and export.ts (type-checked); this file
 // only binds controls to the config and shows the outputs.
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { createPlaygroundBoard, type LogEntry, type PlaygroundBoard } from './board';
+import {
+  type Announcement,
+  createPlaygroundBoard,
+  type LogEntry,
+  type PlaygroundBoard,
+} from './board';
 import { initialConfig, newId, type PlaygroundConfig } from './config';
 import {
   BOARD_SLIDERS,
@@ -17,9 +22,10 @@ const config = reactive<PlaygroundConfig>(initialConfig());
 const host = ref<HTMLElement>();
 const error = ref('');
 const log = ref<LogEntry[]>([]);
+const transcript = ref<Announcement[]>([]);
 const paused = ref(false);
 const autoDrop = ref(false);
-const pane = ref<'log' | 'export'>('log');
+const pane = ref<'log' | 'transcript' | 'export'>('log');
 const copied = ref(false);
 let board: PlaygroundBoard | undefined;
 
@@ -33,6 +39,9 @@ onMounted(() => {
     host: host.value,
     onLog: (entry) => {
       log.value = [entry, ...log.value].slice(0, MAX_LOG);
+    },
+    onAnnounce: (entry) => {
+      transcript.value = [entry, ...transcript.value].slice(0, MAX_LOG);
     },
     onError: (message) => {
       error.value = message;
@@ -241,12 +250,19 @@ const tint = (hex: string) => `${hex}40`;
     <div class="panes">
       <div class="tabs" role="tablist">
         <button type="button" role="tab" :aria-selected="pane === 'log'" @click="pane = 'log'">Callbacks</button>
+        <button type="button" role="tab" :aria-selected="pane === 'transcript'" @click="pane = 'transcript'">Screen reader</button>
         <button type="button" role="tab" :aria-selected="pane === 'export'" @click="pane = 'export'">Export config</button>
       </div>
       <ol v-if="pane === 'log'" class="log" role="tabpanel">
         <li v-if="log.length === 0" class="empty">Play a chip to see callbacks here.</li>
         <li v-for="(entry, i) in log" :key="log.length - i">
           <time>{{ seconds(entry.at) }}s</time> <code>{{ entry.callback }}</code> {{ entry.text }}
+        </li>
+      </ol>
+      <ol v-else-if="pane === 'transcript'" class="log" role="tabpanel">
+        <li v-if="transcript.length === 0" class="empty">Pick up or drop a chip to see what a screen reader announces.</li>
+        <li v-for="(entry, i) in transcript" :key="transcript.length - i">
+          <time>{{ seconds(entry.at) }}s</time> {{ entry.text }}
         </li>
       </ol>
       <div v-else class="export" role="tabpanel">

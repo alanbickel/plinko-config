@@ -11,9 +11,17 @@ export interface LogEntry {
   text: string;
 }
 
+export interface Announcement {
+  /** Milliseconds since the playground started. */
+  at: number;
+  text: string;
+}
+
 export interface PlaygroundBoardInput {
   host: HTMLElement;
   onLog: (entry: LogEntry) => void;
+  /** What the board's live region says, as a screen reader would hear it. */
+  onAnnounce: (entry: Announcement) => void;
   /** An invalid option (PlinkoConfigError), or '' once the board is valid again. */
   onError: (message: string) => void;
 }
@@ -31,10 +39,7 @@ export interface PlaygroundBoard {
 const REBUILD_DELAY_MS = 250;
 const AUTO_DROP_MS = 600;
 
-function callbacks(input: PlaygroundBoardInput, current: () => PlaygroundConfig) {
-  const start = performance.now();
-  const log = (callback: string, text: string) =>
-    input.onLog({ at: performance.now() - start, callback, text });
+function callbacks(log: (callback: string, text: string) => void, current: () => PlaygroundConfig) {
   return {
     onPickUp: ({ chip }) => log('onPickUp', chip.label),
     onDrop: ({ chip, dropX }) => log('onDrop', `${chip.label} at x = ${dropX.toFixed(2)}`),
@@ -57,10 +62,15 @@ class Controller implements PlaygroundBoard {
   private mountedKey = '';
   private rebuildTimer: ReturnType<typeof setTimeout> | undefined;
   private autoDropTimer: ReturnType<typeof setInterval> | undefined;
+  private liveObserver: MutationObserver | undefined;
+  private readonly start = performance.now();
   private readonly hooks: Partial<PlinkoOptions>;
 
   constructor(private readonly input: PlaygroundBoardInput) {
-    this.hooks = callbacks(input, () => this.config as PlaygroundConfig);
+    this.hooks = callbacks(
+      (callback, text) => input.onLog({ at: this.elapsed(), callback, text }),
+      () => this.config as PlaygroundConfig,
+    );
   }
 
   apply(config: PlaygroundConfig): void {
@@ -84,6 +94,7 @@ class Controller implements PlaygroundBoard {
       this.board = next;
       next.update(liveOptions(config));
       this.mountedKey = JSON.stringify(mountOptions(config));
+      this.watchAnnouncements(next);
     });
   }
 
@@ -103,8 +114,26 @@ class Controller implements PlaygroundBoard {
   destroy(): void {
     clearTimeout(this.rebuildTimer);
     clearInterval(this.autoDropTimer);
+    this.liveObserver?.disconnect();
     this.board?.destroy();
     this.board = undefined;
+  }
+
+  private elapsed(): number {
+    return performance.now() - this.start;
+  }
+
+  /** Copies everything the board's live region says into the transcript. */
+  private watchAnnouncements(board: PlinkoBoard): void {
+    this.liveObserver?.disconnect();
+    const live = board.element.querySelector('[aria-live]');
+    if (!live) return;
+    this.liveObserver = new MutationObserver(() => {
+      // The board alternates a trailing zero-width space so a repeated message still announces.
+      const text = live.textContent?.replace(/​/g, '');
+      if (text) this.input.onAnnounce({ at: this.elapsed(), text });
+    });
+    this.liveObserver.observe(live, { childList: true, characterData: true, subtree: true });
   }
 
   /** Runs a board change and reports a PlinkoConfigError instead of throwing it. */
