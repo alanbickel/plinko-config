@@ -5,7 +5,7 @@ import { boardToDropX, type Circle, dropXToBoard, type Layout } from '../../core
 import type { ChipKindConfig, SlotConfig } from '../../core/types';
 import type { ChipBody } from '../../core/world';
 import type { Zone } from '../input/actions';
-import { fontOf, type ResolvedChipStyle, type ResolvedStyles, type ResolvedText } from '../styles';
+import { type ResolvedChipStyle, type ResolvedStyles, type ResolvedText } from '../styles';
 import type { Theme } from '../theme';
 import {
   type BoardPoint,
@@ -30,7 +30,9 @@ import {
   MIN_TEXT_PX,
   planSlotLabels,
   type ResolvedSlotLabels,
+  setFont,
   TEXT_SIZE,
+  textWidth,
 } from './slot-labels';
 
 const WALL = 0.12; // drawn wall thickness (the physics walls are thicker)
@@ -375,14 +377,13 @@ class Painter {
     g.globalAlpha = 1;
   }
 
-  /** Styled slots get a tint behind their column and label, from the rail tops down. */
+  /** Styled slots get a tint behind their column, from the rail tops to the floor. */
   private drawSlotFills(): void {
-    const { g, layout, styles, plan } = this.input;
-    const bottom = layout.floorY + FLOOR + plan.strip.height;
+    const { g, layout, styles } = this.input;
     styles.slots.forEach(({ fill }, i) => {
       if (!fill) return;
       g.fillStyle = fill;
-      g.fillRect(i, layout.railTopY, 1, bottom - layout.railTopY);
+      g.fillRect(i, layout.railTopY, 1, layout.floorY - layout.railTopY);
     });
   }
 
@@ -503,8 +504,8 @@ interface LineInput {
 
 function measureWith(g: CanvasRenderingContext2D): Measure {
   return ({ text, style, size }) => {
-    g.font = fontOf(style, size);
-    return g.measureText(text).width;
+    setFont(g, { style, size });
+    return textWidth(g, text);
   };
 }
 

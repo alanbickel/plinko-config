@@ -3,6 +3,7 @@ import { buildLayout } from '../../core/layout';
 import { DEFAULT_BOARD } from '../../core/options';
 import type { ResolvedText } from '../styles';
 import {
+  drawText,
   fitText,
   type Measure,
   type PlanInput,
@@ -121,5 +122,36 @@ describe('fitText', () => {
     expect(cut.size).toBe(0.2);
     expect(cut.text.endsWith('…')).toBe(true);
     expect(cut.text.length * cut.size * 0.55).toBeLessThanOrEqual(0.9);
+  });
+});
+
+describe('drawText', () => {
+  // Firefox draws nothing for fonts under 1px, whatever the transform.
+  it('never hands the canvas a font under 1px, and scales back to the board-unit size', () => {
+    const drawn: { font: string; scale: number }[] = [];
+    let scale = 1;
+    const g = {
+      font: '',
+      save() {},
+      restore() {
+        scale = 1;
+      },
+      scale(by: number) {
+        scale *= by;
+      },
+      fillText() {
+        drawn.push({ font: g.font, scale });
+      },
+    };
+    drawText(g as unknown as CanvasRenderingContext2D, {
+      text: 'Ads',
+      size: 0.26,
+      style,
+      align: 'center',
+    });
+    const [call] = drawn;
+    const px = Number(/([\d.]+)px/.exec(call?.font ?? '')?.[1]);
+    expect(px).toBeGreaterThanOrEqual(1);
+    expect(px * (call?.scale ?? 0)).toBeCloseTo(0.26);
   });
 });

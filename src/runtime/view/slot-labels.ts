@@ -226,13 +226,30 @@ export interface FittedText {
   size: number;
 }
 
+/**
+ * Fonts are set this many times larger than their board-unit size, and drawing scales back down:
+ * Firefox draws nothing for fonts under 1px, whatever the transform.
+ */
+const FONT_MAGNIFY = 100;
+
+type FontInput = Omit<MeasureInput, 'text'>;
+
+/** Sets the font for text of the given size, board units. Pair with textWidth and drawText. */
+export function setFont(g: CanvasRenderingContext2D, { style, size }: FontInput): void {
+  g.font = fontOf(style, size * FONT_MAGNIFY);
+}
+
+/** Width of text in the font from setFont, board units. */
+export const textWidth = (g: CanvasRenderingContext2D, text: string): number =>
+  g.measureText(text).width / FONT_MAGNIFY;
+
 /** Shrinks text to fit, never below minSize; then cuts it with an ellipsis if it still doesn't. */
 export function fitText({ g, text, style, size, maxWidth, minSize }: FitInput): FittedText {
-  g.font = fontOf(style, size);
-  const width = g.measureText(text).width;
+  setFont(g, { style, size });
+  const width = textWidth(g, text);
   const fitting = width > maxWidth ? (size * maxWidth) / width : size;
   const finalSize = Math.max(minSize, Math.min(size, fitting));
-  g.font = fontOf(style, finalSize);
+  setFont(g, { style, size: finalSize });
   return { text: ellipsize(g, { text, maxWidth }), size: finalSize };
 }
 
@@ -243,9 +260,9 @@ interface EllipsizeInput {
 
 /** Cuts text with an ellipsis to fit maxWidth in the current font. */
 function ellipsize(g: CanvasRenderingContext2D, { text, maxWidth }: EllipsizeInput): string {
-  if (g.measureText(text).width <= maxWidth) return text;
+  if (textWidth(g, text) <= maxWidth) return text;
   let t = text;
-  while (t.length > 1 && g.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
+  while (t.length > 1 && textWidth(g, `${t}…`) > maxWidth) t = t.slice(0, -1);
   return `${t}…`;
 }
 
@@ -259,9 +276,12 @@ export function drawText(
   g: CanvasRenderingContext2D,
   { text, size, style, align }: TextDraw,
 ): void {
-  g.font = fontOf(style, size);
+  setFont(g, { style, size });
   g.fillStyle = style.color;
   g.textAlign = align;
   g.textBaseline = 'middle';
+  g.save();
+  g.scale(1 / FONT_MAGNIFY, 1 / FONT_MAGNIFY);
   g.fillText(text, 0, 0);
+  g.restore();
 }

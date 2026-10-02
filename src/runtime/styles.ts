@@ -16,7 +16,7 @@ export interface TextStyle {
 
 /** How one slot looks. */
 export interface SlotStyle {
-  /** Tint behind the slot's column and label (any CSS colour; use alpha for subtlety). */
+  /** Tint behind the slot's column, from the rail tops to the floor (any CSS colour; use alpha for subtlety). */
   fill?: string;
   /** The slot's label under the board. */
   label?: TextStyle;
