@@ -41,6 +41,10 @@ Biome flags most violations as warnings with a suggested fix. Be kind to your fe
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: one table of 40 key bindings reads better whole
 ```
 
+Exceptions made in `biome.json` itself (which can't hold comments) are listed here:
+
+- `**/*.vue`: `noUnusedVariables` and `noUnusedImports` are off. Biome only reads a `.vue` file's `<script>` block, so anything used only in the template looks unused.
+
 **Scope:** code we own. Code and signatures we don't control follow their owners: vendored third-party code (`src/core/vendor/`) keeps its upstream form, and callbacks for the platform (DOM events, `Array.prototype` methods, test runners) take the parameters the platform passes.
 
 ### 1. Single-responsibility functions

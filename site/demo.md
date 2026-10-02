@@ -1,7 +1,9 @@
 ---
-description: A live plinko-config board.
+layout: page
+title: Playground
+description: Try plinko-config live. Change slots, chips, physics, looks and controls, watch the callbacks, and export the setup as code.
 ---
 
-# Demo
-
-The live showcase is on its way. Until then, run `npm run dev` in the repository to play with the demo pages.
+<ClientOnly>
+  <PlinkoPlayground />
+</ClientOnly>

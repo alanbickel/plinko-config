@@ -63,6 +63,14 @@
       }
     },
     {
+      "includes": ["**/*.vue"],
+      "linter": {
+        "rules": {
+          "correctness": { "noUnusedVariables": "off", "noUnusedImports": "off" }
+        }
+      }
+    },
+    {
       "includes": ["**/*.test.ts", "e2e/**"],
       "linter": {
         "rules": {

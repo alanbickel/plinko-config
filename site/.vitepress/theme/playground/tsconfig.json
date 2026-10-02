@@ -1,0 +1,6 @@
+{
+  "$comment": "Type-checks the playground's logic (.ts only; the .vue files are thin views) with the root TypeScript 7.",
+  "extends": "../../../../tsconfig.json",
+  "include": ["*.ts"],
+  "exclude": []
+}

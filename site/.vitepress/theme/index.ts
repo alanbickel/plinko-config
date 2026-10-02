@@ -1,6 +1,7 @@
-import { useData } from 'vitepress';
+import { type Theme, useData } from 'vitepress';
 import DefaultTheme from 'vitepress/theme';
 import { h } from 'vue';
+import PlinkoPlayground from './playground/PlinkoPlayground.vue';
 import './custom.css';
 
 interface HeroFrontmatter {
@@ -32,4 +33,7 @@ const HeroInfo = {
 export default {
   extends: DefaultTheme,
   Layout: () => h(DefaultTheme.Layout, null, { 'home-hero-info': () => h(HeroInfo) }),
-};
+  enhanceApp({ app }) {
+    app.component('PlinkoPlayground', PlinkoPlayground);
+  },
+} satisfies Theme;
