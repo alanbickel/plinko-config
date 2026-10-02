@@ -5,7 +5,8 @@ import { DEFAULT_BOARD } from '../../core/options';
 import { resolveStyles } from '../styles';
 import { DEFAULT_THEME } from '../theme';
 import { CanvasView } from './canvas';
-import { carryPath, liftToY } from './geometry';
+import { liftToY } from './geometry';
+import { DEFAULT_SLOT_LABELS } from './slot-labels';
 
 const SLOTS = 4;
 const layout = buildLayout(SLOTS, DEFAULT_BOARD);
@@ -26,6 +27,7 @@ function view(width: number) {
       slotIds: Array.from({ length: SLOTS }, (_, i) => `s${i}`),
       chipIds: ['on', 'off'],
     }),
+    slotLabels: DEFAULT_SLOT_LABELS,
     reducedMotion: false,
   });
   return { v, height: v.resize(width, 2) };
@@ -48,7 +50,7 @@ describe('hitTest', () => {
   });
 
   it('maps height to lift along the carry path, clamped to [0, 1]', () => {
-    const path = carryPath(layout);
+    const path = v.carry;
     expect(v.hitTest({ x: 50, y: 1 })?.lift).toBe(1);
     expect(v.hitTest({ x: 50, y: cssY(liftToY(path, 0.5)) })?.lift).toBeCloseTo(0.5);
     expect(v.hitTest({ x: 50, y: height - 1 })?.lift).toBe(0);
@@ -77,7 +79,7 @@ describe('hitTest', () => {
 
 describe('carryPath', () => {
   it('runs from the tray up to the drop line, with the drop zone above the first peg row', () => {
-    const path = carryPath(layout);
+    const path = view(400).v.carry;
     expect(liftToY(path, 1)).toBe(layout.spawnY);
     expect(liftToY(path, 0)).toBeGreaterThan(layout.floorY);
     expect(path.zoneY).toBeLessThan(layout.pegRows[0] ?? 0);

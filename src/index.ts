@@ -4,6 +4,7 @@
  * @module plinko-config
  */
 
+export { DEFAULT_BOARD, DEFAULT_PHYSICS } from './core/options';
 export type {
   AddChips,
   IntervalRefill,
@@ -53,3 +54,8 @@ export type {
   SupplyOptions,
   SupplyRequest,
 } from './runtime/types';
+export {
+  DEFAULT_SLOT_LABELS,
+  type SlotLabelLayout,
+  type SlotLabelOptions,
+} from './runtime/view/slot-labels';

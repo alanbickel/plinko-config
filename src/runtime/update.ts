@@ -6,6 +6,7 @@ import { resolveRuntimeConfig } from './config';
 import { type BoardContext, refresh } from './context';
 import { resolveLook } from './look';
 import { applyMotion } from './motion';
+import { fitToHost } from './sizing';
 import type { BoardUpdate, MountOnlyOption, PlinkoOptions } from './types';
 import { applyLabels } from './view/dom';
 
@@ -30,10 +31,18 @@ export function updateBoard(ctx: BoardContext, update: BoardUpdate): void {
   const look = resolveLook({ options, host: ctx.host, win: ctx.win });
   ctx.options = options;
   ctx.config = config;
-  ctx.machine.configure({ maxInFlight: config.maxInFlight, autoReload: config.autoReload });
+
   ctx.announcer.setLabels(config.labels);
   applyLabels(ctx.dom, config.labels);
-  ctx.view.setLook(look);
+  const restyled = ctx.view.setLook(look);
+  const relabelled = ctx.view.setSlotLabels(config.slotLabels);
+  ctx.carry = ctx.view.carry;
+  ctx.machine.configure({
+    maxInFlight: config.maxInFlight,
+    autoReload: config.autoReload,
+    dropZoneFrom: ctx.carry.zoneFrom,
+  });
+  if (restyled || relabelled) fitToHost(ctx);
   applyMotion(ctx);
   refresh(ctx);
 }

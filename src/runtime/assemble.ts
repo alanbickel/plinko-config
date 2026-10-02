@@ -17,7 +17,6 @@ import type { MotionPreference, PlinkoOptions } from './types';
 import { Announcer } from './view/a11y';
 import { CanvasView } from './view/canvas';
 import { createDom } from './view/dom';
-import { carryPath } from './view/geometry';
 
 export interface AssembleInput {
   host: HTMLElement;
@@ -25,12 +24,13 @@ export interface AssembleInput {
 }
 
 /** The parts that don't need the finished context. */
-type BaseContext = Omit<BoardContext, 'machine' | 'loop'>;
+type BaseContext = Omit<BoardContext, 'machine' | 'loop' | 'carry'>;
 
 export function assemble({ host, options }: AssembleInput): BoardContext {
   const base = createBase({ host, options });
   // The machine and loop close over the context; nothing calls them until the board is ready.
   const ctx = base as BoardContext;
+  ctx.carry = base.view.carry; // the label plan decides where the tray, and so the carry, starts
   ctx.machine = createMachine(ctx);
   ctx.loop = createLoop(ctx);
   return ctx;
@@ -55,7 +55,6 @@ function createBase({ host, options }: AssembleInput): BaseContext {
     chips,
     kindIds: chips.map((c) => c.id),
     world: new World({ layout, physics: core.physics }),
-    carry: carryPath(layout),
     supply: new Supply({ kinds: chips, refill: config.refill }),
     dom,
     view: new CanvasView({
@@ -64,6 +63,7 @@ function createBase({ host, options }: AssembleInput): BaseContext {
       kinds: chips,
       slots,
       ...look,
+      slotLabels: config.slotLabels,
       reducedMotion: motion.reducedMotion,
     }),
     announcer: new Announcer({ live: dom.live, labels: config.labels }),

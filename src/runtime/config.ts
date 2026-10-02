@@ -6,7 +6,11 @@ import { check, inPositiveUnit } from '../core/validate';
 import { type KeyBindings, resolveKeys } from './input/keyboard';
 import { DEFAULT_LABELS, type Labels } from './labels';
 import type { MotionPreference, PlinkoOptions } from './types';
-import { defaultLiftSteps } from './view/geometry';
+import {
+  DEFAULT_SLOT_LABELS,
+  type ResolvedSlotLabels,
+  type SlotLabelLayout,
+} from './view/slot-labels';
 
 export interface RuntimeConfig {
   motion: MotionPreference;
@@ -14,8 +18,10 @@ export interface RuntimeConfig {
   autoReload: boolean;
   aimStep: number;
   aimStepLarge: number;
-  liftStep: number;
-  liftStepLarge: number;
+  /** Set by the host; undefined means one peg row of the current carry path (see liftSteps). */
+  liftStep: number | undefined;
+  liftStepLarge: number | undefined;
+  slotLabels: ResolvedSlotLabels;
   keys: KeyBindings;
   labels: Labels;
   attribution: boolean;
@@ -32,6 +38,7 @@ export function resolveRuntimeConfig({ options, layout }: RuntimeConfigInput): R
   const config: RuntimeConfig = {
     ...behaviour(options),
     ...steps({ options, layout }),
+    slotLabels: { ...DEFAULT_SLOT_LABELS, ...options.slotLabels },
     keys: resolveKeys(options.keys),
     labels: { ...DEFAULT_LABELS, ...options.labels },
     refill: resolveRefill(options.supply?.refill),
@@ -39,8 +46,14 @@ export function resolveRuntimeConfig({ options, layout }: RuntimeConfigInput): R
   checkCounts(options.chips);
   check(MOTIONS.includes(config.motion), "motion must be 'auto', 'full', or 'reduced'");
   check(isMaxInFlight(config.maxInFlight), 'maxInFlight must be a positive integer or Infinity');
-  for (const key of STEP_OPTIONS)
-    check(inPositiveUnit(config[key]), `${key} must be a number in (0, 1]`);
+  for (const key of STEP_OPTIONS) {
+    const value = config[key];
+    check(value === undefined || inPositiveUnit(value), `${key} must be a number in (0, 1]`);
+  }
+  check(
+    LAYOUTS.includes(config.slotLabels.layout),
+    "slotLabels.layout must be 'horizontal', 'vertical', 'backboard', or 'angled'",
+  );
   return config;
 }
 
@@ -57,16 +70,17 @@ function behaviour(options: PlinkoOptions): Behaviour {
 
 type StepSizes = Pick<RuntimeConfig, (typeof STEP_OPTIONS)[number]>;
 
-/** Aim steps default to a quarter slot and a slot; lift steps to one peg row and four. */
+/** Aim steps default to a quarter slot and a slot. Lift steps stay unset unless the host sets them. */
 function steps({ options, layout }: RuntimeConfigInput): StepSizes {
-  const lift = defaultLiftSteps(layout);
   return {
     aimStep: options.aimStep ?? 1 / (4 * layout.slotCount),
     aimStepLarge: options.aimStepLarge ?? 1 / layout.slotCount,
-    liftStep: options.liftStep ?? lift.liftStep,
-    liftStepLarge: options.liftStepLarge ?? lift.liftStepLarge,
+    liftStep: options.liftStep,
+    liftStepLarge: options.liftStepLarge,
   };
 }
+
+const LAYOUTS: readonly SlotLabelLayout[] = ['horizontal', 'vertical', 'backboard', 'angled'];
 
 const MOTIONS: readonly MotionPreference[] = ['auto', 'full', 'reduced'];
 

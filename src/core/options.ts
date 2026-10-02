@@ -10,7 +10,8 @@ import type {
 } from './types';
 import { check, inUnit, isFiniteNumber, isPositive } from './validate';
 
-export const DEFAULT_BOARD: ResolvedBoard = {
+/** The board shape used for every option you leave out of `board`. */
+export const DEFAULT_BOARD: Required<BoardConfig> = {
   rows: 8,
   pegRadius: 0.08,
   chipRadius: 0.3,
@@ -18,7 +19,11 @@ export const DEFAULT_BOARD: ResolvedBoard = {
   railWidth: 0.08,
 };
 
-export const DEFAULT_PHYSICS: Omit<ResolvedPhysics, 'seed' | 'bias'> = {
+/**
+ * The physics used for every option you leave out of `physics`. `seed` (random when omitted) and
+ * `bias` (none) have no fixed default, so they aren't listed.
+ */
+export const DEFAULT_PHYSICS: Required<Omit<PhysicsConfig, 'seed' | 'bias'>> = {
   gravity: 45,
   restitution: 0.3,
   friction: 0.1,

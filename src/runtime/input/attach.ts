@@ -2,6 +2,7 @@
 // focus ring.
 
 import type { BoardContext } from '../context';
+import { defaultLiftSteps, type LiftSteps } from '../view/geometry';
 import { interpretKey, type KeyContext } from './keyboard';
 import { createPerform, type Perform } from './perform';
 import { attachPointer } from './pointer-dom';
@@ -49,9 +50,17 @@ function keyContext(ctx: BoardContext): KeyContext {
     kindCount: kindIds.length,
     aimStep: config.aimStep,
     aimStepLarge: config.aimStepLarge,
-    liftStep: config.liftStep,
-    liftStepLarge: config.liftStepLarge,
+    ...liftSteps(ctx),
     keys: config.keys,
+  };
+}
+
+/** The host's lift steps, or one and four peg rows of the board's current carry path. */
+function liftSteps({ config, carry }: BoardContext): LiftSteps {
+  const defaults = defaultLiftSteps(carry);
+  return {
+    liftStep: config.liftStep ?? defaults.liftStep,
+    liftStepLarge: config.liftStepLarge ?? defaults.liftStepLarge,
   };
 }
 

@@ -15,18 +15,27 @@ import {
   FALL_MS,
   type FallingChip,
   FLOOR,
-  LABEL_H,
   liftToY,
   TRAY_CHIP_DY,
   TRAY_H,
   type Viewport,
   yToLift,
 } from './geometry';
+import {
+  drawSlotLabels,
+  drawText,
+  fitText,
+  type LabelPlan,
+  type Measure,
+  MIN_TEXT_PX,
+  planSlotLabels,
+  type ResolvedSlotLabels,
+  TEXT_SIZE,
+} from './slot-labels';
 
 const WALL = 0.12; // drawn wall thickness (the physics walls are thicker)
 const TRAY_CHIP_R = 0.32;
-/** Text sizes in board units: labels and captions, tray notes, the full-board banner. */
-const TEXT_SIZE = 0.26;
+/** Text sizes in board units: tray notes and the full-board banner (captions use TEXT_SIZE). */
 const NOTE_SIZE = 0.2;
 const BANNER_SIZE = 0.34;
 /** Opacity of an empty kind in the tray. */
@@ -94,6 +103,7 @@ export interface CanvasViewInput {
   theme: Theme;
   /** Per-slot and per-chip looks, already layered over the theme. */
   styles: ResolvedStyles;
+  slotLabels: ResolvedSlotLabels;
   reducedMotion: boolean;
 }
 
@@ -103,11 +113,19 @@ export interface Look {
   styles: ResolvedStyles;
 }
 
-interface PainterInput extends CanvasViewInput {
-  g: CanvasRenderingContext2D;
+/** Where everything goes; recomputed when the label plan changes the label strip. */
+interface Geometry {
   viewport: Viewport;
   carry: CarryPath;
+  plan: LabelPlan;
 }
+
+interface PainterInput extends CanvasViewInput, Geometry {
+  g: CanvasRenderingContext2D;
+}
+
+/** Without a 2D context (jsdom) there's nothing to measure with: estimate from the length. */
+const estimate: Measure = ({ text, size }) => text.length * size * 0.55;
 
 interface Stroke {
   color: string;
@@ -115,24 +133,54 @@ interface Stroke {
 }
 
 export class CanvasView {
-  private readonly viewport: Viewport;
-  private readonly carry: CarryPath;
+  private geometry: Geometry;
   /** Absent when there's no 2D context (e.g. jsdom); the view then just doesn't draw. */
   private readonly painter: Painter | undefined;
+  private readonly measure: Measure;
   /** Width on the page, CSS pixels; set by resize. */
   private cssWidth = 1;
 
   constructor(private input: CanvasViewInput) {
-    this.viewport = computeViewport(input.layout);
-    this.carry = carryPath(input.layout);
     const g = input.canvas.getContext('2d');
-    const painterInput = { ...input, g, viewport: this.viewport, carry: this.carry };
-    this.painter = g ? new Painter({ ...painterInput, g }) : undefined;
+    this.measure = g ? measureWith(g) : estimate;
+    this.geometry = this.computeGeometry();
+    this.painter = g ? new Painter({ ...input, ...this.geometry, g }) : undefined;
   }
 
   /** Width ÷ height of everything drawn, tray included. */
   get aspect(): number {
     return this.viewport.w / this.viewport.h;
+  }
+
+  /** The held chip's path from the tray to the drop line; moves with the label strip. */
+  get carry(): CarryPath {
+    return this.geometry.carry;
+  }
+
+  private get viewport(): Viewport {
+    return this.geometry.viewport;
+  }
+
+  /** Plans the labels, then lays out everything around their strip. */
+  private computeGeometry(): Geometry {
+    const { layout, slots, styles, slotLabels } = this.input;
+    const plan = planSlotLabels({
+      labels: slots.map((slot) => slot.label),
+      styles: slots.map((_, i) => styles.slots[i]?.label ?? styles.text),
+      options: slotLabels,
+      layout,
+      measure: this.measure,
+    });
+    const geometry = { layout, strip: plan.strip };
+    return { viewport: computeViewport(geometry), carry: carryPath(geometry), plan };
+  }
+
+  /** Re-plans after the labels' fonts or layout change. True if the board's shape changed. */
+  private relayout(): boolean {
+    const before = this.viewport;
+    this.geometry = this.computeGeometry();
+    this.painter?.setGeometry(this.geometry);
+    return before.w !== this.viewport.w || before.h !== this.viewport.h;
   }
 
   /** Sizes the backing store for a CSS width; returns the CSS height to use. */
@@ -142,7 +190,10 @@ export class CanvasView {
     const cssHeight = (cssWidth * this.viewport.h) / this.viewport.w;
     canvas.width = Math.max(1, Math.round(cssWidth * dpr));
     canvas.height = Math.max(1, Math.round(cssHeight * dpr));
-    this.painter?.setScale(canvas.width / this.viewport.w);
+    this.painter?.setScale({
+      device: canvas.width / this.viewport.w,
+      css: cssWidth / this.viewport.w,
+    });
     return cssHeight;
   }
 
@@ -150,10 +201,17 @@ export class CanvasView {
     this.painter?.paint(frame);
   }
 
-  /** New colours and fonts from the next frame on (board.update). */
-  setLook(look: Look): void {
+  /** New colours and fonts from the next frame on (board.update). True if the board must refit. */
+  setLook(look: Look): boolean {
     this.input = { ...this.input, ...look };
     this.painter?.setLook(look);
+    return this.relayout();
+  }
+
+  /** A new label layout (board.update). True if the board must refit. */
+  setSlotLabels(slotLabels: ResolvedSlotLabels): boolean {
+    this.input = { ...this.input, slotLabels };
+    return this.relayout();
   }
 
   /** Peg flashes and falling lost chips follow this from the next frame on. */
@@ -174,7 +232,7 @@ export class CanvasView {
       zone: point.y < trayY ? 'board' : 'tray',
       index: Math.min(kinds.length - 1, Math.max(0, column)),
       x: boardToDropX(layout, point.x),
-      lift: yToLift(this.carry, point.y),
+      lift: yToLift(this.geometry.carry, point.y),
       point,
     };
   }
@@ -183,6 +241,8 @@ export class CanvasView {
 class Painter {
   private readonly chipStyles = new Map<string, ResolvedChipStyle>();
   private scale = 1;
+  /** MIN_TEXT_PX in board units at the current size. */
+  private minSize = 0;
 
   constructor(private input: PainterInput) {
     this.setLook(input);
@@ -200,8 +260,14 @@ class Painter {
     });
   }
 
-  setScale(scale: number): void {
-    this.scale = scale;
+  setGeometry(geometry: Geometry): void {
+    this.input = { ...this.input, ...geometry };
+  }
+
+  /** Device pixels per board unit (drawing) and CSS pixels per board unit (the text floor). */
+  setScale({ device, css }: Scale): void {
+    this.scale = device;
+    this.minSize = MIN_TEXT_PX / css;
   }
 
   paint(frame: FrameState): void {
@@ -209,10 +275,13 @@ class Painter {
     this.drawDropZone(frame.dropZone);
     this.drawSlotFills();
     this.drawFrame();
+    // Backboard labels are printed on the slots' back walls, behind rails and chips.
+    const backboard = this.input.plan.mode === 'backboard';
+    if (backboard) this.drawSlotLabels();
     this.drawRails();
     this.drawPegs(frame);
     this.drawChips(frame);
-    this.drawSlotLabels();
+    if (!backboard) this.drawSlotLabels();
     this.drawTray(frame);
     // In hand and falling chips pass in front of everything, the tray included.
     this.drawHeld(frame);
@@ -308,8 +377,8 @@ class Painter {
 
   /** Styled slots get a tint behind their column and label, from the rail tops down. */
   private drawSlotFills(): void {
-    const { g, layout, styles } = this.input;
-    const bottom = layout.floorY + FLOOR + LABEL_H;
+    const { g, layout, styles, plan } = this.input;
+    const bottom = layout.floorY + FLOOR + plan.strip.height;
     styles.slots.forEach(({ fill }, i) => {
       if (!fill) return;
       g.fillStyle = fill;
@@ -318,11 +387,15 @@ class Painter {
   }
 
   private drawSlotLabels(): void {
-    const { g, layout, slots, styles } = this.input;
-    const y = layout.floorY + FLOOR + LABEL_H / 2;
-    slots.forEach((slot, i) => {
-      this.textStyle(styles.slots[i]?.label ?? styles.text, TEXT_SIZE);
-      g.fillText(this.fit(slot.label, 0.95), i + 0.5, y);
+    const { g, layout, slots, styles, plan } = this.input;
+    drawSlotLabels({
+      g,
+      plan,
+      labels: slots.map((slot) => slot.label),
+      styles: slots.map((_, i) => styles.slots[i]?.label ?? styles.text),
+      layout,
+      stripTop: layout.floorY + FLOOR,
+      minSize: this.minSize,
     });
   }
 
@@ -349,15 +422,14 @@ class Painter {
     this.chip(at, kind.id);
     g.globalAlpha = 1;
     if (selected) this.drawSelection({ at, frame });
-    this.textStyle(
-      captionStyle({ label: styles.chips[index]?.label, selected, styles }),
-      TEXT_SIZE,
-    );
-    g.fillText(this.fit(`${kind.label} ×${formatCount(count)}`, cell * 0.95), at.x, at.y + 0.6);
+    const caption = captionStyle({ label: styles.chips[index]?.label, selected, styles });
+    const maxWidth = cell * 0.95;
+    const text = `${kind.label} ×${formatCount(count)}`;
+    this.line({ text, style: caption, size: TEXT_SIZE, maxWidth, at: { x: at.x, y: at.y + 0.6 } });
     const note = frame.trayNotes[index];
     if (!note) return;
-    this.textStyle(styles.mutedText, NOTE_SIZE);
-    g.fillText(this.fit(note, cell * 0.95), at.x, at.y + 0.95);
+    const noteAt = { x: at.x, y: at.y + 0.95 };
+    this.line({ text: note, style: styles.mutedText, size: NOTE_SIZE, maxWidth, at: noteAt });
   }
 
   /** The selected tray kind: a focus ring while the tray has focus, a quiet ring otherwise. */
@@ -372,25 +444,19 @@ class Painter {
     const y = (layout.spawnY + layout.railTopY) / 2;
     g.fillStyle = theme.overlay;
     g.fillRect(viewport.x0, y - 0.7, viewport.w, 1.4);
-    this.textStyle({ ...this.input.styles.text, fontWeight: '600' }, BANNER_SIZE);
-    g.fillText(this.fit(message, viewport.w - 0.4), layout.width / 2, y);
+    const style = { ...this.input.styles.text, fontWeight: '600' };
+    const at = { x: layout.width / 2, y };
+    this.line({ text: message, style, size: BANNER_SIZE, maxWidth: viewport.w - 0.4, at });
   }
 
-  private textStyle(text: ResolvedText, size: number): void {
+  /** One centred line: shrunk to fit (never below the minimum size), then cut with "…". */
+  private line({ text, style, size, maxWidth, at }: LineInput): void {
     const { g } = this.input;
-    g.font = fontOf(text, size);
-    g.fillStyle = text.color;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-  }
-
-  /** Shortens text with an ellipsis to fit maxWidth (board units) in the current font. */
-  private fit(text: string, maxWidth: number): string {
-    const { g } = this.input;
-    if (g.measureText(text).width <= maxWidth) return text;
-    let t = text;
-    while (t.length > 1 && g.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
-    return `${t}…`;
+    const fitted = fitText({ g, text, style, size, maxWidth, minSize: this.minSize });
+    g.save();
+    g.translate(at.x, at.y);
+    drawText(g, { ...fitted, style, align: 'center' });
+    g.restore();
   }
 
   private focusStroke(): Stroke {
@@ -420,6 +486,26 @@ class Painter {
     g.lineWidth = stroke.width;
     g.stroke();
   }
+}
+
+interface Scale {
+  device: number;
+  css: number;
+}
+
+interface LineInput {
+  text: string;
+  style: ResolvedText;
+  size: number;
+  maxWidth: number;
+  at: BoardPoint;
+}
+
+function measureWith(g: CanvasRenderingContext2D): Measure {
+  return ({ text, style, size }) => {
+    g.font = fontOf(style, size);
+    return g.measureText(text).width;
+  };
 }
 
 interface TrayChipInput {

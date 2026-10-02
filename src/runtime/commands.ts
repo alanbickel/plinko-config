@@ -50,6 +50,7 @@ export interface CommandMachineInput {
 export interface MachineSettings {
   maxInFlight: number;
   autoReload: boolean;
+  dropZoneFrom: number;
 }
 
 export interface DropCommand {

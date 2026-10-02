@@ -4,6 +4,7 @@ import type { KeyBindings } from './input/keyboard';
 import type { Labels } from './labels';
 import type { Styles } from './styles';
 import type { Theme } from './theme';
+import type { SlotLabelOptions } from './view/slot-labels';
 
 // Callbacks take one object each, so new fields never break existing hosts.
 
@@ -103,7 +104,10 @@ export interface PlinkoOptions<CV = unknown, SV = unknown> extends CoreOptions<C
   aimStep?: number;
   /** Shift+arrow step, as a fraction of the drop width, in (0, 1]. Default 1 slot. */
   aimStepLarge?: number;
-  /** Up/down arrow step, as a fraction of the carry from tray to drop line, in (0, 1]. Default one peg row. */
+  /**
+   * Up/down arrow step, as a fraction of the carry from tray to drop line, in (0, 1]. Default one
+   * peg row (the carry's length depends on the slot label layout, so the fraction does too).
+   */
   liftStep?: number;
   /** Shift+up/down step, as a fraction of the carry, in (0, 1]. Default four peg rows. */
   liftStepLarge?: number;
@@ -120,6 +124,11 @@ export interface PlinkoOptions<CV = unknown, SV = unknown> extends CoreOptions<C
    * {@link PlinkoBoard.update}. Ids that aren't on the board throw a PlinkoConfigError.
    */
   styles?: Styles;
+  /**
+   * Where slot labels go (under the slots, on their back walls, slanted, …), for the whole board.
+   * Can change with update(); the board refits, since some layouts need more room.
+   */
+  slotLabels?: SlotLabelOptions;
   /** Text to override, for wording or translation. Unlisted labels keep {@link DEFAULT_LABELS}. */
   labels?: Partial<Labels>;
   /** "Powered by LittleJS" link under the board. Default true. */

@@ -663,6 +663,23 @@ describe('motion', () => {
   });
 });
 
+describe('slot labels', () => {
+  it('refits the board when the label layout changes its shape', () => {
+    const b = mount(); // default: vertical, since "Email Marketing" doesn't fit one line
+    const tall = parseFloat(canvasOf(b).style.height);
+    b.update({ slotLabels: { layout: 'horizontal' } });
+    expect(parseFloat(canvasOf(b).style.height)).toBeLessThan(tall);
+  });
+
+  it('rejects an unknown layout, changing nothing', () => {
+    const b = mount();
+    expect(() =>
+      b.update({ slotLabels: { layout: 'diagonal' as 'angled' }, labels: { board: 'changed' } }),
+    ).toThrow(/slotLabels.layout must be/);
+    expect(canvasOf(b).getAttribute('aria-label')).toBe('Plinko preferences board');
+  });
+});
+
 describe('destroy', () => {
   it('removes everything and leaves the host as it was', () => {
     const b = mount();
