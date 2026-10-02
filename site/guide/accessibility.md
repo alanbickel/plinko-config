@@ -54,11 +54,18 @@ The same message is announced again if it repeats. Every message comes from a te
 
 ## Reduced motion
 
-When the user prefers reduced motion:
+By default (`motion: 'auto'`), the board follows the visitor's `prefers-reduced-motion` setting, and it switches as soon as that setting changes, with no reload. Set `motion: 'reduced'` or `motion: 'full'` to choose for them, for example from your app's own settings. You can change it later with `board.update()`.
 
+With reduced motion:
+
+- a dropped chip settles at once instead of falling
 - pegs don't flash when hit
 - lost chips fade out instead of falling
 - scrolling the board into view is instant instead of smooth
+
+Nothing else changes. Callbacks fire in the same order (`onDrop`, the peg hits, then `onLand` or `onMiss`, then the `drop()` promise resolves), and a seeded drop lands in the same slot as it would with animation.
+
+To try it, turn on "Emulate CSS prefers-reduced-motion: reduce" in your browser's developer tools, or turn off animation effects in your operating system's accessibility settings.
 
 ## Touch
 
