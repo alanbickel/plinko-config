@@ -5,17 +5,26 @@
 import type { ChipKindConfig } from './types';
 import { check, isPositive } from './validate';
 
+/** Spent chips never come back. This is the default. */
 export interface NeverRefill {
+  /** Selects this policy. */
   mode: 'never';
 }
 
-/** An empty kind can be requested; the host may grant or deny (see the runtime's onRequest). */
+/**
+ * Players can ask for more chips of a kind once it runs out. Your `onRequest` callback grants or
+ * denies each request; without one, every request is granted.
+ */
 export interface OnRequestRefill {
+  /** Selects this policy. */
   mode: 'onRequest';
 }
 
+/** Chips trickle back on a timer, up to a cap. */
 export interface IntervalRefill {
+  /** Selects this policy. */
   mode: 'interval';
+  /** Time between refills, in milliseconds. */
   everyMs: number;
   /** Chips added per kind each interval. Default 1. */
   amount?: number;
@@ -23,6 +32,7 @@ export interface IntervalRefill {
   max?: number;
 }
 
+/** How spent chips come back. Set it with `supply.refill`. */
 export type RefillPolicy = NeverRefill | OnRequestRefill | IntervalRefill;
 
 export interface ResolvedIntervalRefill extends IntervalRefill {
@@ -38,16 +48,23 @@ export interface SupplyInput {
 
 /** Chips left per kind. A chip in hand counts as used. Unlimited kinds report Infinity. */
 export interface SupplySnapshot {
+  /** Chip kind id → chips left. */
   counts: Record<string, number>;
 }
 
+/** Input to `board.supply.set()`. */
 export interface SetCount {
+  /** The chip kind's id. */
   chip: string;
+  /** The new count: a whole number ≥ 0, or `Infinity` for unlimited. */
   count: number;
 }
 
+/** Input to `board.supply.add()`. */
 export interface AddChips {
+  /** The chip kind's id. */
   chip: string;
+  /** Chips to add. Negative removes chips. */
   amount: number;
 }
 

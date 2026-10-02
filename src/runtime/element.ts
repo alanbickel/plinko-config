@@ -3,8 +3,19 @@
 // board's lifecycle: it mounts when connected, remounts when a mount-only option changes, and
 // destroys the board when disconnected.
 
+import type { SupplySnapshot } from '../core/supply';
 import { createPlinko } from './board';
-import type { MountOnlyOption, PlinkoBoard, PlinkoOptions } from './types';
+import type {
+  ChipDetails,
+  DropDetails,
+  FullDetails,
+  LandDetails,
+  MissDetails,
+  MountOnlyOption,
+  PegHitDetails,
+  PlinkoBoard,
+  PlinkoOptions,
+} from './types';
 
 /** Callbacks re-fired as events, and the event each becomes. */
 const EVENTS = {
@@ -20,12 +31,50 @@ const EVENTS = {
 
 type EventCallback = keyof typeof EVENTS;
 
-/** Events fired by <plinko-board>; each detail is what the matching callback receives. */
-export type PlinkoBoardEventMap = {
+/**
+ * The DOM events `<plinko-board>` fires. Each one mirrors a callback in {@link PlinkoOptions}:
+ * its `detail` is the object that callback receives. All of them bubble and cross shadow DOM
+ * boundaries (`composed`), so you can listen on the element or any ancestor.
+ *
+ * @example
+ * ```ts
+ * board.addEventListener('plinko-land', (event) => {
+ *   const { chip, slot } = (event as PlinkoBoardEventMap['plinko-land']).detail;
+ *   savePreference(slot.id, chip.value);
+ * });
+ * ```
+ */
+export interface PlinkoBoardEventMap {
+  /** A chip was picked up from the tray. Mirrors {@link PlinkoOptions.onPickUp}. */
+  'plinko-pick-up': CustomEvent<ChipDetails>;
+  /** A chip was dropped from the drop zone and is falling. Mirrors {@link PlinkoOptions.onDrop}. */
+  'plinko-drop': CustomEvent<DropDetails>;
+  /** A falling chip hit a peg. Mirrors {@link PlinkoOptions.onPegHit}. */
+  'plinko-peg-hit': CustomEvent<PegHitDetails>;
+  /** A chip came to rest in a slot. Mirrors {@link PlinkoOptions.onLand}. */
+  'plinko-land': CustomEvent<LandDetails>;
+  /** A chip came to rest without reaching a slot. Mirrors {@link PlinkoOptions.onMiss}. */
+  'plinko-miss': CustomEvent<MissDetails>;
+  /** The board filled up and locked. Fires once. Mirrors {@link PlinkoOptions.onFull}. */
+  'plinko-full': CustomEvent<FullDetails>;
+  /** Chip counts changed. Mirrors {@link PlinkoOptions.onSupplyChange}. */
+  'plinko-supply-change': CustomEvent<SupplySnapshot>;
+  /**
+   * The last chip of a kind was used up (dropped, or lost off the board). Mirrors
+   * {@link PlinkoOptions.onExhausted}.
+   */
+  'plinko-exhausted': CustomEvent<ChipDetails>;
+}
+
+// Compile-time guard: the written-out map above must match EVENTS and the callback types exactly.
+type DerivedEventMap = {
   [K in EventCallback as (typeof EVENTS)[K]]: CustomEvent<
     Parameters<NonNullable<PlinkoOptions[K]>>[0]
   >;
 };
+type MutuallyAssignable<A, B> = [A, B] extends [B, A] ? true : false;
+const EVENT_MAP_MATCHES: MutuallyAssignable<PlinkoBoardEventMap, DerivedEventMap> = true;
+void EVENT_MAP_MATCHES;
 
 const MOUNT_ONLY: readonly MountOnlyOption[] = [
   'slots',
@@ -41,6 +90,23 @@ const STYLE = ':host{display:block}div{height:100%}';
 // Importing this module where there's no DOM (server rendering) must not throw.
 const BaseElement = (globalThis.HTMLElement ?? class {}) as typeof HTMLElement;
 
+/**
+ * The `<plinko-board>` custom element. Importing `plinko-config/element` registers it.
+ *
+ * Set `options` as a property (they hold arrays and functions, so there are no attributes). The
+ * board mounts when the element is in the document and has options, and is destroyed when the
+ * element is removed. Changing `options` updates the live board, or remounts it if a mount-only
+ * option changed. Every callback is also fired as a DOM event; see {@link PlinkoBoardEventMap}.
+ *
+ * @example
+ * ```ts
+ * import 'plinko-config/element';
+ *
+ * const el = document.querySelector('plinko-board')!;
+ * el.options = { slots, chips };
+ * el.addEventListener('plinko-land', (event) => console.log(event));
+ * ```
+ */
 export class PlinkoBoardElement extends BaseElement {
   private config: PlinkoOptions | undefined;
   private current: PlinkoBoard | undefined;
@@ -60,6 +126,7 @@ export class PlinkoBoardElement extends BaseElement {
     return this.config;
   }
 
+  /** Setting `undefined` destroys the board. */
   set options(next: PlinkoOptions | undefined) {
     const previous = this.config;
     this.config = next;
@@ -71,10 +138,12 @@ export class PlinkoBoardElement extends BaseElement {
     return this.current;
   }
 
+  /** Called by the browser when the element is added to a document: mounts the board. */
   connectedCallback(): void {
     this.apply(undefined);
   }
 
+  /** Called by the browser when the element is removed: destroys the board. */
   disconnectedCallback(): void {
     this.unmount();
   }

@@ -1,4 +1,8 @@
-// Public API.
+/**
+ * Mount a Plinko board with {@link createPlinko} and react to where chips land.
+ *
+ * @module plinko-config
+ */
 
 export type {
   AddChips,

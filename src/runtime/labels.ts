@@ -1,10 +1,14 @@
 import type { ChipKindConfig, SlotConfig } from '../core/types';
 
+/** What a {@link ChipLabel} template receives. */
 export interface ChipLabelInput {
+  /** The chip kind the message is about. */
   chip: ChipKindConfig<unknown>;
 }
 
+/** What the `landed` template receives. */
 export interface LandingLabelInput extends ChipLabelInput {
+  /** The slot the chip landed in. */
   slot: SlotConfig<unknown>;
 }
 
@@ -16,7 +20,9 @@ export interface StockLabelInput extends ChipLabelInput {
   canRequest: boolean;
 }
 
+/** What the `settledBatch` template receives. */
 export interface BatchLabelInput {
+  /** The chips in the batch that landed, and where. */
   landed: LandingLabelInput[];
   /** How many chips in the batch missed. */
   missed: number;
@@ -33,8 +39,11 @@ export interface Labels {
   instructions: string;
   /** Tray selection changed, or the tray zone was entered. */
   selected: (input: StockLabelInput) => string;
+  /** A chip was picked up. */
   pickedUp: ChipLabel;
+  /** The held chip was put back in the tray. */
   cancelled: ChipLabel;
+  /** A chip was dropped in the drop zone and is falling. */
   dropped: ChipLabel;
   /** The held chip was carried into the drop zone. */
   enteredDropZone: string;
@@ -42,14 +51,19 @@ export interface Labels {
   leftDropZone: string;
   /** Dropped outside the drop zone: the chip is gone. */
   fellOff: ChipLabel;
+  /** A chip landed in a slot. */
   landed: (input: LandingLabelInput) => string;
+  /** A chip came to rest without reaching a slot. */
   missed: ChipLabel;
   /** Several settled close together (rapid fire), batched into one announcement. */
   settledBatch: (input: BatchLabelInput) => string;
+  /** A kind has none left: the player tried to pick one up, or `autoReload` found it empty. */
   outOfChips: (input: StockLabelInput) => string;
   /** A request for more chips was sent to the host. */
   requesting: ChipLabel;
+  /** The host granted a request for more chips. */
   granted: ChipLabel;
+  /** The host denied a request for more chips. */
   denied: ChipLabel;
   /** Shown in the tray under an empty kind that can be requested. */
   requestMore: string;
@@ -59,9 +73,14 @@ export interface Labels {
   busy: string;
   /** The board is full; shown on the board and announced. */
   locked: string;
+  /** Text of the "Powered by LittleJS" link (see the `attribution` option). */
   attribution: string;
 }
 
+/**
+ * The built-in English text. Pass only the labels you want to change in `labels`; the rest come
+ * from here.
+ */
 export const DEFAULT_LABELS: Labels = {
   board: 'Plinko preferences board',
   instructions:

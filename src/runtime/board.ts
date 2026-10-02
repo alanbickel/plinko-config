@@ -9,6 +9,23 @@ import { fitToHost } from './sizing';
 import { startRefills, supplyChanged } from './supply';
 import type { PlinkoBoard, PlinkoOptions } from './types';
 
+/**
+ * Mounts a Plinko board inside `target` and starts it.
+ *
+ * @param target - The element to mount in, or a CSS selector for it.
+ * @param options - Slots, chips, and everything else. See {@link PlinkoOptions}.
+ * @returns A handle for playing the board from code, changing options, and cleaning up.
+ * @throws {@link PlinkoConfigError} If `target` matches nothing or an option is invalid.
+ *
+ * @example
+ * ```ts
+ * const board = createPlinko('#board', {
+ *   slots: [{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }],
+ *   chips: [{ id: 'theme', label: 'Theme' }],
+ *   onLand: ({ slot }) => setTheme(slot.id),
+ * });
+ * ```
+ */
 export function createPlinko<CV = unknown, SV = unknown>(
   target: HTMLElement | string,
   options: PlinkoOptions<CV, SV>,

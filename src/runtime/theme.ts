@@ -1,17 +1,26 @@
 /** Colours for the canvas. Resolved from options.theme, then --plinko-* CSS properties, then defaults. */
 export interface Theme {
+  /** Behind the board. */
   background: string;
+  /** The side walls and the bumps set into them. */
   wall: string;
+  /** Pegs at rest. */
   peg: string;
+  /** A peg's flash when a chip hits it. Not shown with reduced motion. */
   pegHit: string;
+  /** The rails between slots. */
   rail: string;
   /** Chips whose kind has no colour. */
   chip: string;
   /** Chip outline, so chips stay distinct from each other and the background. */
   chipStroke: string;
+  /** Slot labels, the selected tray chip's label, and the "board is full" banner text. */
   text: string;
+  /** Other tray labels and notes; the ring around the selected chip when the tray isn't focused. */
   mutedText: string;
+  /** The keyboard focus ring, drawn on the canvas. */
   focus: string;
+  /** Behind the chip tray. */
   tray: string;
   /** Where a held chip can be dropped from: outline and glow. */
   dropZone: string;
@@ -19,7 +28,7 @@ export interface Theme {
   overlay: string;
 }
 
-// Text and focus colours meet WCAG AA (≥ 4.5:1) against the background.
+/** The built-in dark theme. Its text and focus colours meet WCAG AA contrast (≥ 4.5:1). */
 export const DEFAULT_THEME: Theme = {
   background: '#11151c',
   wall: '#3b4553',

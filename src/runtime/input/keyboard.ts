@@ -5,7 +5,9 @@ import type { InputAction } from './actions';
 
 /** KeyboardEvent.key values per action. ' ' is the space bar. */
 export interface KeyBindings {
+  /** Choose the previous chip kind in the tray, or move the held chip left. */
   left: string[];
+  /** Choose the next chip kind in the tray, or move the held chip right. */
   right: string[];
   /** Carry the held chip up, toward the drop zone. */
   up: string[];
@@ -15,11 +17,18 @@ export interface KeyBindings {
   home: string[];
   /** Jump to the right edge. */
   end: string[];
+  /** Pick up the selected chip kind. On an empty kind that can be requested, ask for more. */
   pickUp: string[];
+  /** Drop the held chip. Outside the drop zone, the chip is lost. */
   drop: string[];
+  /** Put the held chip back in the tray. */
   cancel: string[];
 }
 
+/**
+ * The built-in bindings: arrow keys to choose, carry, and aim; Home/End to jump to the edges;
+ * Enter or Space to pick up and drop; Escape to put back. Shift with an arrow takes bigger steps.
+ */
 export const DEFAULT_KEYS: KeyBindings = {
   left: ['ArrowLeft'],
   right: ['ArrowRight'],

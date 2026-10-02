@@ -1,6 +1,6 @@
 {
   "$schema": "https://typedoc-plugin-markdown.org/schema.json",
-  "entryPoints": ["../src/index.ts"],
+  "entryPoints": ["../src/index.ts", "../src/element.ts"],
   "tsconfig": "./tsconfig.typedoc.json",
   "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
   "out": "./api",
@@ -9,5 +9,6 @@
   "excludeInternal": true,
   "excludePrivate": true,
   "sort": ["kind", "alphabetical"],
-  "validation": { "notExported": true, "invalidLink": true, "notDocumented": false }
+  "validation": { "notExported": true, "invalidLink": true, "notDocumented": true },
+  "treatValidationWarningsAsErrors": true
 }
