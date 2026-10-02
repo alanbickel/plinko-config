@@ -96,6 +96,7 @@ describe('mounting', () => {
     const canvas = canvasOf(b);
     expect(canvas.tabIndex).toBe(0);
     expect(canvas.getAttribute('role')).toBe('application');
+    expect(canvas.getAttribute('aria-roledescription')).toBe('game');
     expect(canvas.getAttribute('aria-label')).toBe('Plinko preferences board');
     const describedBy = canvas.getAttribute('aria-describedby') ?? '';
     expect(document.getElementById(describedBy)?.textContent).toMatch(/arrows/i);
@@ -494,9 +495,16 @@ describe('update', () => {
 
   it('puts new wording on the canvas, the instructions, and announcements', () => {
     const b = mount();
-    b.update({ labels: { board: 'Settings, the hard way', instructions: 'Good luck.' } });
+    b.update({
+      labels: {
+        board: 'Settings, the hard way',
+        instructions: 'Good luck.',
+        roleDescription: 'form',
+      },
+    });
     const canvas = canvasOf(b);
     expect(canvas.getAttribute('aria-label')).toBe('Settings, the hard way');
+    expect(canvas.getAttribute('aria-roledescription')).toBe('form');
     const describedBy = canvas.getAttribute('aria-describedby') ?? '';
     expect(document.getElementById(describedBy)?.textContent).toBe('Good luck.');
     b.update({ labels: { cancelled: ({ chip }) => `${chip.label}: back you go.` } });

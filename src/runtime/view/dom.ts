@@ -61,6 +61,7 @@ export function createDom({ host, labels, attribution }: CreateDomInput): BoardD
 /** Puts new wording on the nodes that carry labels (board.update). */
 export function applyLabels(dom: BoardDom, labels: Labels): void {
   dom.canvas.setAttribute('aria-label', labels.board);
+  dom.canvas.setAttribute('aria-roledescription', labels.roleDescription);
   dom.instructions.textContent = labels.instructions;
   if (dom.attribution) dom.attribution.textContent = labels.attribution;
 }
@@ -78,7 +79,7 @@ function createCanvas({ doc, id, labels }: Maker): HTMLCanvasElement {
   canvas.tabIndex = 0;
   canvas.setAttribute('part', 'canvas');
   canvas.setAttribute('role', 'application');
-  canvas.setAttribute('aria-roledescription', 'game');
+  canvas.setAttribute('aria-roledescription', labels.roleDescription);
   canvas.setAttribute('aria-label', labels.board);
   canvas.setAttribute('aria-describedby', `${id}-instructions`);
   canvas.style.cssText = 'display:block;margin:0 auto;touch-action:none;user-select:none';

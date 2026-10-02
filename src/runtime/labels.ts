@@ -35,6 +35,8 @@ export type ChipLabel = (input: ChipLabelInput) => string;
 export interface Labels {
   /** aria-label of the canvas. */
   board: string;
+  /** What screen readers call the board (aria-roledescription). */
+  roleDescription: string;
   /** Read once when the board gets focus (aria-describedby). */
   instructions: string;
   /** Tray selection changed, or the tray zone was entered. */
@@ -83,6 +85,7 @@ export interface Labels {
  */
 export const DEFAULT_LABELS: Labels = {
   board: 'Plinko preferences board',
+  roleDescription: 'game',
   instructions:
     'Left and right arrows choose a chip; Enter picks it up. Up and down arrows carry it, left ' +
     'and right move it across, Shift with arrows moves faster, Home and End jump to the edges. ' +
