@@ -7,8 +7,25 @@ const guide: DefaultTheme.SidebarItem = {
   items: [
     { text: 'Getting started', link: '/guide/getting-started' },
     { text: 'Chip supply', link: '/guide/chip-supply' },
+    { text: 'Frameworks', link: '/guide/frameworks' },
+    { text: 'Accessibility', link: '/guide/accessibility' },
   ],
 };
+
+/**
+ * Flattens the TypeDoc sidebar into one level of sections ("plinko-config › Interfaces", …).
+ * vitepress-plugin-llms 1.14 drops the base path from links in nested sections.
+ */
+function flattenForLlms(item: DefaultTheme.SidebarItem, path: string): DefaultTheme.SidebarItem[] {
+  const children = item.items ?? [];
+  const overview = item.link ? [{ text: `${item.text} overview`, link: item.link }] : [];
+  const leaves = [...overview, ...children.filter((child) => !child.items)];
+  const own = leaves.length > 0 ? [{ text: path, items: leaves }] : [];
+  const nested = children
+    .filter((child) => child.items)
+    .flatMap((child) => flattenForLlms(child, `${path} › ${child.text}`));
+  return [...own, ...nested];
+}
 
 // Served from GitHub Pages at alanbickel.github.io/plinko-config/.
 export default defineConfig({
@@ -32,9 +49,12 @@ export default defineConfig({
   },
   vite: {
     plugins: [
-      // One level of sections only: vitepress-plugin-llms 1.14 drops the base path from links
-      // in nested sections, so the TypeDoc groups (Classes, Interfaces, …) go in at the top.
-      llmstxt({ sidebar: [guide, ...typedocSidebar] }),
+      llmstxt({
+        sidebar: [
+          guide,
+          ...typedocSidebar.flatMap((module) => flattenForLlms(module, module.text)),
+        ],
+      }),
     ],
   },
 });

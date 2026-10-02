@@ -26,11 +26,13 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             site/package-lock.json
-      # Root install: the examples are type-checked with the library's TypeScript 7.
+      # Both installs first: the examples are type-checked with the library's TypeScript 7, and
+      # the framework recipes resolve React, Solid, and Angular types from site/node_modules.
       - run: npm ci
-      - run: npx tsc -p site/examples
       - run: npm ci
         working-directory: site
+      - run: npm run docs:examples
+      # Fails if any public export lacks a doc comment (TypeDoc validation).
       - run: npm run build
         working-directory: site
       - uses: actions/upload-pages-artifact@v5

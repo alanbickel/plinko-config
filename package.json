@@ -11,6 +11,7 @@
     "web-component",
     "canvas"
   ],
+  "homepage": "https://alanbickel.github.io/plinko-config/",
   "license": "MIT-0",
   "type": "module",
   "sideEffects": [
@@ -44,7 +45,10 @@
     "size": "size-limit",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build && npm run size",
     "sim": "tsx scripts/simulate.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "docs:dev": "npm --prefix site run dev",
+    "docs:build": "npm --prefix site run build",
+    "docs:examples": "tsc -p site/examples && tsc -p site/examples/recipes/html && tsc -p site/examples/recipes/react && tsc -p site/examples/recipes/solid && tsc -p site/examples/recipes/angular"
   },
   "size-limit": [
     {

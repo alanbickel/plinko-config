@@ -1,47 +1,53 @@
 # plinko-config
 
-Set user preferences by playing Plinko. A deliberately terrible UI component.
+Game-ify your settings. Drive your app with Plinko.
 
-> **Work in progress.** Nothing to install yet. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it's put together.
+A delightfully sinister UI component. Insanely configurable, framework-agnostic, a11y-first, with zero runtime dependencies.
 
-## Chip supply
+**[Documentation](https://alanbickel.github.io/plinko-config/)** · [Getting started](https://alanbickel.github.io/plinko-config/guide/getting-started) · [API reference](https://alanbickel.github.io/plinko-config/api/)
 
-Each chip kind has a `count` (leave it out for unlimited). Spent chips come back according to `supply.refill`:
+> **Work in progress.** Not on npm yet.
 
-```ts
-createPlinko('#board', {
-  slots,
-  chips: [{ id: 'on', label: 'On', count: 3 }],
-  supply: { refill: { mode: 'onRequest' } }, // or { mode: 'never' }, or { mode: 'interval', everyMs: 5000 }
-  onRequest: async ({ chip }) => ((await askManager(chip.id)) ? 'grant' : 'deny'),
-});
+## Install
+
+```sh
+npm install plinko-config
 ```
 
-When every chip is spent and none can come back, the board locks for good.
+ESM only, with its own types.
 
-### Keeping counts across page loads
-
-The library never stores anything; your app owns its state. To keep chip counts, save the snapshot from `onSupplyChange` and pass it back as `count`:
+## Quick start
 
 ```ts
-const saved = JSON.parse(localStorage.getItem('plinko-supply') ?? '{"counts":{}}');
+import { createPlinko } from 'plinko-config';
 
-createPlinko('#board', {
-  slots,
-  chips: [{ id: 'on', label: 'On', count: saved.counts.on ?? 3 }],
-  onSupplyChange: (snapshot) => localStorage.setItem('plinko-supply', JSON.stringify(snapshot)),
+const board = createPlinko('#board', {
+  slots: [
+    { id: 'light', label: 'Light', value: 'light' },
+    { id: 'dark', label: 'Dark', value: 'dark' },
+    { id: 'system', label: 'System', value: 'system' },
+  ],
+  chips: [{ id: 'theme', label: 'Theme' }],
+  onLand: ({ slot }) => {
+    document.documentElement.dataset.theme = slot.value;
+  },
 });
+
+// Later: board.destroy();
 ```
 
-Unlimited counts are `Infinity`, which JSON stores as `null`. If you persist unlimited kinds, read them back with `?? Infinity`.
+Prefer HTML? `import 'plinko-config/element'` and use `<plinko-board>`. The docs have [framework recipes](https://alanbickel.github.io/plinko-config/guide/frameworks) for React, Solid, and Angular, plus guides to chip supply and accessibility.
 
 ## Development
 
 ```sh
 npm install
-npm run dev      # demo page
-npm run check    # lint, typecheck, test, build, size
+npm run dev        # demo pages
+npm run check      # lint, typecheck, test, build, size
+npm run docs:dev   # docs site (run npm install in site/ first)
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Credits
 

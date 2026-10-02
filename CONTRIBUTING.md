@@ -15,8 +15,19 @@ npx playwright install chromium   # once, for e2e tests
 | `npm run check` | Lint, typecheck, unit tests, build, size budget |
 | `npm run test:e2e` | Playwright suite in `e2e/` |
 | `npm run sim -- --drops 5000 --x 0.5` | Headless physics simulation (options in `scripts/simulate.ts`) |
+| `npm run docs:dev` | Docs site with live reload (run `npm install` in `site/` once first) |
+| `npm run docs:build` | Build the docs site; fails on undocumented exports or dead links |
+| `npm run docs:examples` | Type-check the docs examples and framework recipes |
 
 Architecture is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Documentation
+
+The docs site lives in `site/` (VitePress) and deploys to GitHub Pages from `main`. Most of it is generated from the code, so keep the code and its comments accurate:
+
+- **Every public export needs a doc comment**, and so does each of its fields. The API reference is generated from them by TypeDoc, and the docs build fails if one is missing. Write for a developer who has never seen the library: say what it does and when to use it, not how it's implemented. Use `@defaultValue` for defaults.
+- **Code examples are real files** in `site/examples/`, pulled into pages with `<<< ../examples/file.ts#region`. They're type-checked against `src/`, so an API change that breaks an example breaks the build. Don't paste untested code into a page.
+- **`site/` is its own package**, pinned to TypeScript 6, because TypeDoc doesn't support TypeScript 7 yet. The library itself stays on TypeScript 7.
 
 ## Coding standards
 
