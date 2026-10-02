@@ -66,4 +66,4 @@ The canvas sets `touch-action: none`, so dragging a chip never scrolls the page.
 
 ## Colour
 
-The default theme's text and focus colours meet WCAG AA contrast (at least 4.5:1) against its background. If you change the theme, check your own colours.
+The default theme's text and focus colours meet WCAG AA contrast (at least 4.5:1) against its background. If you change colours with `theme` or `styles`, check their contrast too.

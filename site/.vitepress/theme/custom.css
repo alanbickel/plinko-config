@@ -1,0 +1,51 @@
+/* Home hero (see HeroInfo in index.ts): name, italic byline, a gap, then the headline. */
+.hero-name {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--vp-home-hero-name-color);
+}
+
+.hero-byline {
+  margin-top: 8px;
+  font-size: 18px;
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--vp-c-text-2);
+}
+
+.hero-headline {
+  margin-top: 32px;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--vp-c-text-1);
+}
+
+@media (min-width: 640px) {
+  .hero-name {
+    font-size: 56px;
+  }
+  .hero-byline {
+    font-size: 20px;
+  }
+  .hero-headline {
+    margin-top: 40px;
+    font-size: 32px;
+  }
+}
+
+@media (min-width: 960px) {
+  .hero-name {
+    font-size: 72px;
+  }
+  .hero-byline {
+    font-size: 22px;
+  }
+  .hero-headline {
+    margin-top: 48px;
+    font-size: 40px;
+  }
+}

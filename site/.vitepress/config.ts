@@ -50,6 +50,8 @@ export default defineConfig({
   vite: {
     plugins: [
       llmstxt({
+        // The hero text has a <br> for layout; llms.txt gets it as plain text.
+        description: 'Game-ify your settings. Drive your app with Plinko.',
         sidebar: [
           guide,
           ...typedocSidebar.flatMap((module) => flattenForLlms(module, module.text)),

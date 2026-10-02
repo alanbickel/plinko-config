@@ -9,7 +9,7 @@ plinko-config doesn't depend on any framework. Use the `<plinko-board>` element,
 Every recipe follows the same pattern:
 
 1. Mount once, when the component mounts.
-2. Send later changes (callbacks, labels, theme) to the live board with `board.update()`. Slots, chips, and the piles of landed chips stay put.
+2. Send later changes (callbacks, labels, theme, styles) to the live board with `board.update()`. Slots, chips, and the piles of landed chips stay put.
 3. Call `destroy()` when the component unmounts.
 
 ## Web Component
