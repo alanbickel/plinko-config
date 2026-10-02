@@ -128,3 +128,14 @@ test('with reduced motion, a dropped chip settles at once instead of falling', a
   // A fall takes seconds; settling at once lands within a frame or two.
   await expect(page.locator('#log')).toContainText(/onLand|onMiss/, { timeout: 500 });
 });
+
+test('the attribution link sits under the board, even in a host wider than the board', async ({
+  page,
+}) => {
+  const canvas = await page.locator('#host canvas').boundingBox();
+  const host = await page.locator('#host').boundingBox();
+  const link = await page.locator('#host [part="attribution"]').boundingBox();
+  if (!canvas || !host || !link) throw new Error('not laid out');
+  expect(canvas.width).toBeLessThan(host.width - 20); // the board is narrower than its host here
+  expect(Math.abs(link.x + link.width - (canvas.x + canvas.width))).toBeLessThan(1);
+});

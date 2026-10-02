@@ -109,6 +109,13 @@ describe('mounting', () => {
     expect(mount({ attribution: false }).element.querySelector('a')).toBeNull();
   });
 
+  it('sizes the attribution link to the canvas, so it sits under the board, not the host', () => {
+    const b = mount();
+    const link = b.element.querySelector('a');
+    expect(link?.style.width).toBe(canvasOf(b).style.width);
+    expect(link?.style.margin).toContain('auto');
+  });
+
   it('keeps instances independent', () => {
     const a = mount();
     const b = mount();

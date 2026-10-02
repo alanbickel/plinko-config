@@ -26,6 +26,7 @@ export function fitToHost(ctx: BoardContext): void {
   const height = ctx.view.resize(width, ctx.win?.devicePixelRatio || 1);
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
+  if (ctx.dom.attribution) ctx.dom.attribution.style.width = `${width}px`;
   ctx.loop.redraw();
 }
 
