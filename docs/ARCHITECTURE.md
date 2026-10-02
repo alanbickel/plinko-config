@@ -78,7 +78,7 @@ flowchart TB
 
             subgraph pkg["plinko-config package"]
                 element["<b>plinko-config/element</b><br/><i>[Container: ES module]</i><br/>&lt;plinko-board&gt; Web Component.<br/>Properties in, CustomEvents out."]:::container
-                core["<b>plinko-config</b><br/><i>[Container: ES module, ≤12 KB gz]</i><br/>createPlinko(), presets,<br/>runtime + pure core"]:::container
+                core["<b>plinko-config</b><br/><i>[Container: ES module, ≤14 KB brotli]</i><br/>createPlinko(),<br/>runtime + pure core"]:::container
             end
 
             dom["<b>Host DOM subtree</b><br/><i>[Container: DOM]</i><br/>Mount target element. Library appends<br/>one wrapper: canvas, live region,<br/>attribution link"]:::external
@@ -468,7 +468,7 @@ sequenceDiagram
 
 **Sizing.** The board fills the host's width, but is never taller than the screen. The screen's height comes from a hidden ruler inside the wrapper, `100svh` tall (the height with mobile browser bars shown, so the board doesn't resize as they hide and show), clipped by a zero-size box so it never adds to the page's scroll height. Touch drags can't scroll the page, so the whole board, tray included, must fit on screen. If the host has a height of its own, the board also fits inside it, centred. To tell the two apart, the board collapses its canvas for a moment and measures what height the host keeps. The wrapper, the host, and the ruler are observed (a ResizeObserver, so no window listener), and refits run on the next frame: refitting inside a ResizeObserver callback, when the host's height follows the canvas, makes the browser report an error on the page.
 
-**Live updates.** `board.update(options)` changes a live board: callbacks, labels, theme, keys, step sizes, `autoReload`, `maxInFlight`. It validates everything before changing anything, and refuses the *mount-only* options (`slots`, `chips`, `board`, `physics`, `supply`, `attribution`) with a `PlinkoConfigError`: those shape the world, so changing them means a new board, and a live board never silently loses its piles. Handlers read options and labels when they run, never earlier, so an update applies from the next event on.
+**Live updates.** `board.update(options)` changes a live board: callbacks, labels, theme, styles, keys, step sizes, `autoReload`, `maxInFlight`. It validates everything before changing anything, and refuses the *mount-only* options (`slots`, `chips`, `board`, `physics`, `supply`, `attribution`) with a `PlinkoConfigError`: those shape the world, so changing them means a new board, and a live board never silently loses its piles. Handlers read options and labels when they run, never earlier, so an update applies from the next event on.
 
 **`<plinko-board>`.** The element mounts the board in an open shadow root once it is connected and has `options`, and destroys it when disconnected. Setting `options` again calls `update()` for live options, or remounts when a mount-only option changes *by value* (frameworks often rebuild the options object on every render, and identity would remount each time). Every callback is also fired as a bubbling, composed `plinko-*` event (`plinko-land`, `plinko-drop`, …) carrying the callback's object; `onRequest` stays a callback, since an event can't answer. Importing the entry registers the tag once (`definePlinkoBoard(tag)` registers other names), and importing it without a DOM (server rendering) does nothing.
 

@@ -9,9 +9,9 @@ import { resolveRuntimeConfig } from './config';
 import { type BoardContext, initialUiState, refresh } from './context';
 import { dispatchByType } from './dispatch';
 import { createLoop } from './frame';
+import { resolveLook } from './look';
 import { noticeHandlers } from './notices';
 import { supplyChanged } from './supply';
-import { resolveTheme } from './theme';
 import type { PlinkoOptions } from './types';
 import { Announcer } from './view/a11y';
 import { CanvasView } from './view/canvas';
@@ -42,7 +42,7 @@ function createBase({ host, options }: AssembleInput): BaseContext {
   const config = resolveRuntimeConfig({ options, layout });
   const win = host.ownerDocument.defaultView;
   const dom = createDom({ host, labels: config.labels, attribution: config.attribution });
-  const theme = resolveTheme(options.theme, win?.getComputedStyle(host));
+  const look = resolveLook({ options, host, win });
   const reducedMotion = prefersReducedMotion(win);
   return {
     host,
@@ -56,14 +56,23 @@ function createBase({ host, options }: AssembleInput): BaseContext {
     world: new World({ layout, physics: core.physics }),
     carry: carryPath(layout),
     supply: new Supply({ kinds: chips, refill: config.refill }),
-    requests: new Map(),
     dom,
-    view: new CanvasView({ canvas: dom.canvas, layout, kinds: chips, slots, theme, reducedMotion }),
+    view: new CanvasView({
+      canvas: dom.canvas,
+      layout,
+      kinds: chips,
+      slots,
+      ...look,
+      reducedMotion,
+    }),
     announcer: new Announcer({ live: dom.live, labels: config.labels }),
-    ui: initialUiState(),
-    settling: new Map(),
-    events: [],
+    ...emptyState(),
   };
+}
+
+/** What a new board starts with: nothing pending, nothing settling, default UI state. */
+function emptyState(): Pick<BoardContext, 'requests' | 'ui' | 'settling' | 'events'> {
+  return { requests: new Map(), ui: initialUiState(), settling: new Map(), events: [] };
 }
 
 function createMachine(ctx: BoardContext): CommandMachine {

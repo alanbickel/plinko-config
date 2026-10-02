@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildLayout } from '../../core/layout';
 import { DEFAULT_BOARD } from '../../core/options';
-import { resolveTheme } from '../theme';
+import { resolveStyles } from '../styles';
+import { DEFAULT_THEME } from '../theme';
 import { CanvasView } from './canvas';
 import { carryPath, liftToY } from './geometry';
 
@@ -18,7 +19,13 @@ function view(width: number) {
       { id: 'off', label: 'Off' },
     ],
     slots: Array.from({ length: SLOTS }, (_, i) => ({ id: `s${i}`, label: `S${i}` })),
-    theme: resolveTheme(undefined, undefined),
+    theme: DEFAULT_THEME,
+    styles: resolveStyles({
+      styles: undefined,
+      theme: DEFAULT_THEME,
+      slotIds: Array.from({ length: SLOTS }, (_, i) => `s${i}`),
+      chipIds: ['on', 'off'],
+    }),
     reducedMotion: false,
   });
   return { v, height: v.resize(width, 2) };

@@ -553,6 +553,32 @@ describe('update', () => {
   });
 });
 
+describe('styles', () => {
+  it('refuses styles for slots or chips that are not on the board, at mount and on update', () => {
+    expect(() => mount({ styles: { slots: { emial: { fill: 'red' } } } })).toThrow(
+      /styles.slots has no slot with id emial/,
+    );
+    const b = mount();
+    expect(() =>
+      b.update({ styles: { chips: { maybe: {} } }, labels: { board: 'changed' } }),
+    ).toThrow(/styles.chips has no chip with id maybe/);
+    // Nothing changed: a bad update is all or nothing.
+    expect(canvasOf(b).getAttribute('aria-label')).toBe('Plinko preferences board');
+  });
+
+  it('accepts styles for real slots and chips, at mount and live', () => {
+    const b = mount({
+      styles: {
+        text: { fontFamily: 'Georgia, serif' },
+        slots: { email: { fill: 'rgba(62, 199, 168, 0.2)', label: { color: '#3ec7a8' } } },
+      },
+    });
+    expect(() =>
+      b.update({ styles: { chips: { on: { fill: '#3ec7a8', stroke: '#fff' } } } }),
+    ).not.toThrow();
+  });
+});
+
 describe('destroy', () => {
   it('removes everything and leaves the host as it was', () => {
     const b = mount();

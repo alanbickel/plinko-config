@@ -31,6 +31,7 @@ export {
   type LandingLabelInput,
   type StockLabelInput,
 } from './runtime/labels';
+export type { ChipStyle, SlotStyle, Styles, TextStyle } from './runtime/styles';
 export { DEFAULT_THEME, type Theme } from './runtime/theme';
 export type {
   BoardUpdate,

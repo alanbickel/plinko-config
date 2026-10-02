@@ -11,8 +11,6 @@ export interface SlotConfig<SV = unknown> {
   label: string;
   /** What landing here means for your app. Passed back to `onLand`. */
   value?: SV;
-  /** Not drawn yet; reserved for slot colours. */
-  color?: string;
   /** Anything else you want to carry along. The board never reads it; `onLand` hands it back. */
   data?: unknown;
 }
@@ -27,8 +25,6 @@ export interface ChipKindConfig<CV = unknown> {
   label: string;
   /** What this chip means for your app. Passed back to callbacks. */
   value?: CV;
-  /** Any CSS colour. Defaults to the theme's `chip` colour. */
-  color?: string;
   /**
    * Chips of this kind the player starts with: a whole number ≥ 0, or `Infinity`.
    *

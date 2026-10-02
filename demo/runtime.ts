@@ -94,9 +94,10 @@ function boardOptions(): PlinkoOptions {
   return {
     slots: SLOT_NAMES.slice(0, slotCount).map((label, i) => ({ id: `s${i}`, label })),
     chips: [
-      { id: 'on', label: 'On', color: '#3ec7a8', count: optionalNumber('countOn') },
-      { id: 'off', label: 'Off', color: '#e0607e', count: optionalNumber('countOff') },
+      { id: 'on', label: 'On', count: optionalNumber('countOn') },
+      { id: 'off', label: 'Off', count: optionalNumber('countOff') },
     ],
+    styles: { chips: { on: { fill: '#3ec7a8' }, off: { fill: '#e0607e' } } },
     supply: { refill: REFILLS[select('refill')]?.() },
     onRequest: onRequest(),
     onSupplyChange: (s) => log('onSupplyChange', s.counts),

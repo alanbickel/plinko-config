@@ -5,6 +5,7 @@ import { boardToDropX, type Circle, dropXToBoard, type Layout } from '../../core
 import type { ChipKindConfig, SlotConfig } from '../../core/types';
 import type { ChipBody } from '../../core/world';
 import type { Zone } from '../input/actions';
+import { fontOf, type ResolvedChipStyle, type ResolvedStyles, type ResolvedText } from '../styles';
 import type { Theme } from '../theme';
 import {
   type BoardPoint,
@@ -24,11 +25,12 @@ import {
 
 const WALL = 0.12; // drawn wall thickness (the physics walls are thicker)
 const TRAY_CHIP_R = 0.32;
-const FONT = '0.26px system-ui, sans-serif';
-const NOTE_FONT = '0.2px system-ui, sans-serif';
+/** Text sizes in board units: labels and captions, tray notes, the full-board banner. */
+const TEXT_SIZE = 0.26;
+const NOTE_SIZE = 0.2;
+const BANNER_SIZE = 0.34;
 /** Opacity of an empty kind in the tray. */
 const EMPTY_ALPHA = 0.35;
-const BANNER_FONT = '600 0.34px system-ui, sans-serif';
 /** How long a peg stays lit after a hit. */
 export const PEG_FLASH_MS = 120;
 
@@ -90,7 +92,15 @@ export interface CanvasViewInput {
   kinds: readonly ChipKindConfig<unknown>[];
   slots: readonly SlotConfig<unknown>[];
   theme: Theme;
+  /** Per-slot and per-chip looks, already layered over the theme. */
+  styles: ResolvedStyles;
   reducedMotion: boolean;
+}
+
+/** Everything that decides colours and fonts; replaced as a whole by board.update(). */
+export interface Look {
+  theme: Theme;
+  styles: ResolvedStyles;
 }
 
 interface PainterInput extends CanvasViewInput {
@@ -140,10 +150,10 @@ export class CanvasView {
     this.painter?.paint(frame);
   }
 
-  /** New colours from the next frame on (board.update). */
-  setTheme(theme: Theme): void {
-    this.input = { ...this.input, theme };
-    this.painter?.setTheme(theme);
+  /** New colours and fonts from the next frame on (board.update). */
+  setLook(look: Look): void {
+    this.input = { ...this.input, ...look };
+    this.painter?.setLook(look);
   }
 
   /** What's under a point, or null outside the canvas. */
@@ -165,16 +175,19 @@ export class CanvasView {
 }
 
 class Painter {
-  private readonly kindColor = new Map<string, string>();
+  private readonly chipStyles = new Map<string, ResolvedChipStyle>();
   private scale = 1;
 
   constructor(private input: PainterInput) {
-    this.setTheme(input.theme);
+    this.setLook(input);
   }
 
-  setTheme(theme: Theme): void {
-    this.input = { ...this.input, theme };
-    for (const k of this.input.kinds) this.kindColor.set(k.id, k.color ?? theme.chip);
+  setLook({ theme, styles }: Look): void {
+    this.input = { ...this.input, theme, styles };
+    this.input.kinds.forEach((kind, i) => {
+      const style = styles.chips[i];
+      if (style) this.chipStyles.set(kind.id, style);
+    });
   }
 
   setScale(scale: number): void {
@@ -184,6 +197,7 @@ class Painter {
   paint(frame: FrameState): void {
     this.clear();
     this.drawDropZone(frame.dropZone);
+    this.drawSlotFills();
     this.drawFrame();
     this.drawRails();
     this.drawPegs(frame);
@@ -282,11 +296,22 @@ class Painter {
     g.globalAlpha = 1;
   }
 
+  /** Styled slots get a tint behind their column and label, from the rail tops down. */
+  private drawSlotFills(): void {
+    const { g, layout, styles } = this.input;
+    const bottom = layout.floorY + FLOOR + LABEL_H;
+    styles.slots.forEach(({ fill }, i) => {
+      if (!fill) return;
+      g.fillStyle = fill;
+      g.fillRect(i, layout.railTopY, 1, bottom - layout.railTopY);
+    });
+  }
+
   private drawSlotLabels(): void {
-    const { g, layout, slots, theme } = this.input;
+    const { g, layout, slots, styles } = this.input;
     const y = layout.floorY + FLOOR + LABEL_H / 2;
-    this.textStyle(FONT, theme.text);
     slots.forEach((slot, i) => {
+      this.textStyle(styles.slots[i]?.label ?? styles.text, TEXT_SIZE);
       g.fillText(this.fit(slot.label, 0.95), i + 0.5, y);
     });
   }
@@ -301,7 +326,7 @@ class Painter {
   }
 
   private drawTrayChip({ kind, index, frame }: TrayChipInput): void {
-    const { g, layout, kinds, theme } = this.input;
+    const { g, layout, kinds, styles } = this.input;
     const cell = layout.width / kinds.length;
     const at: Circle = {
       x: cell * (index + 0.5),
@@ -314,11 +339,14 @@ class Painter {
     this.chip(at, kind.id);
     g.globalAlpha = 1;
     if (selected) this.drawSelection({ at, frame });
-    this.textStyle(FONT, selected ? theme.text : theme.mutedText);
+    this.textStyle(
+      captionStyle({ label: styles.chips[index]?.label, selected, styles }),
+      TEXT_SIZE,
+    );
     g.fillText(this.fit(`${kind.label} ×${formatCount(count)}`, cell * 0.95), at.x, at.y + 0.6);
     const note = frame.trayNotes[index];
     if (!note) return;
-    this.textStyle(NOTE_FONT, theme.mutedText);
+    this.textStyle(styles.mutedText, NOTE_SIZE);
     g.fillText(this.fit(note, cell * 0.95), at.x, at.y + 0.95);
   }
 
@@ -334,14 +362,14 @@ class Painter {
     const y = (layout.spawnY + layout.railTopY) / 2;
     g.fillStyle = theme.overlay;
     g.fillRect(viewport.x0, y - 0.7, viewport.w, 1.4);
-    this.textStyle(BANNER_FONT, theme.text);
+    this.textStyle({ ...this.input.styles.text, fontWeight: '600' }, BANNER_SIZE);
     g.fillText(this.fit(message, viewport.w - 0.4), layout.width / 2, y);
   }
 
-  private textStyle(font: string, color: string): void {
+  private textStyle(text: ResolvedText, size: number): void {
     const { g } = this.input;
-    g.font = font;
-    g.fillStyle = color;
+    g.font = fontOf(text, size);
+    g.fillStyle = text.color;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
   }
@@ -361,8 +389,9 @@ class Painter {
 
   private chip(at: Circle, kindId: string): void {
     const { theme } = this.input;
-    this.circle(at, this.kindColor.get(kindId) ?? theme.chip);
-    this.ring(at, { color: theme.chipStroke, width: 0.03 });
+    const style = this.chipStyles.get(kindId);
+    this.circle(at, style?.fill ?? theme.chip);
+    this.ring(at, { color: style?.stroke ?? theme.chipStroke, width: 0.03 });
   }
 
   private circle({ x, y, r }: Circle, color: string): void {
@@ -410,3 +439,15 @@ function interpolate(chip: ChipBody, alpha: number): Point {
 const grow = (c: Circle, by: number): Circle => ({ ...c, r: c.r + by });
 
 const formatCount = (n: number): string => (n === Infinity ? '∞' : String(n));
+
+interface CaptionInput {
+  label: ResolvedText | undefined;
+  selected: boolean;
+  styles: ResolvedStyles;
+}
+
+/** A tray caption: the kind's label style when selected; muted otherwise, in the kind's font. */
+function captionStyle({ label, selected, styles }: CaptionInput): ResolvedText {
+  const own = label ?? styles.text;
+  return selected ? own : { ...own, color: styles.mutedText.color };
+}

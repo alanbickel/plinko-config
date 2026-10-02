@@ -4,7 +4,7 @@
 import { check } from '../core/validate';
 import { resolveRuntimeConfig } from './config';
 import { type BoardContext, refresh } from './context';
-import { resolveTheme } from './theme';
+import { resolveLook } from './look';
 import type { BoardUpdate, MountOnlyOption, PlinkoOptions } from './types';
 import { applyLabels } from './view/dom';
 
@@ -26,11 +26,12 @@ export function updateBoard(ctx: BoardContext, update: BoardUpdate): void {
   );
   const options: PlinkoOptions = { ...ctx.options, ...update };
   const config = resolveRuntimeConfig({ options, layout: ctx.world.layout });
+  const look = resolveLook({ options, host: ctx.host, win: ctx.win });
   ctx.options = options;
   ctx.config = config;
   ctx.machine.configure({ maxInFlight: config.maxInFlight, autoReload: config.autoReload });
   ctx.announcer.setLabels(config.labels);
   applyLabels(ctx.dom, config.labels);
-  ctx.view.setTheme(resolveTheme(options.theme, ctx.win?.getComputedStyle(ctx.host)));
+  ctx.view.setLook(look);
   refresh(ctx);
 }

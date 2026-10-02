@@ -2,6 +2,7 @@ import type { AddChips, RefillPolicy, SetCount, SupplySnapshot } from '../core/s
 import type { ChipKindConfig, CoreOptions, SlotConfig } from '../core/types';
 import type { KeyBindings } from './input/keyboard';
 import type { Labels } from './labels';
+import type { Styles } from './styles';
 import type { Theme } from './theme';
 
 // Callbacks take one object each, so new fields never break existing hosts.
@@ -101,6 +102,12 @@ export interface PlinkoOptions<CV = unknown, SV = unknown> extends CoreOptions<C
    * {@link DEFAULT_THEME}.
    */
   theme?: Partial<Theme>;
+  /**
+   * Looks for particular slots and chip kinds, keyed by id, plus fonts for every canvas text.
+   * Anything left out comes from {@link PlinkoOptions.theme}. Can change on a live board with
+   * {@link PlinkoBoard.update}. Ids that aren't on the board throw a PlinkoConfigError.
+   */
+  styles?: Styles;
   /** Text to override, for wording or translation. Unlisted labels keep {@link DEFAULT_LABELS}. */
   labels?: Partial<Labels>;
   /** "Powered by LittleJS" link under the board. Default true. */
