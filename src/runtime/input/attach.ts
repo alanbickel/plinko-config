@@ -2,6 +2,7 @@
 
 import { announceSelected, type BoardContext, refresh } from '../context';
 import { dispatchByType, type HandlerMap } from '../dispatch';
+import { requestChips } from '../supply';
 import { interpretKey, type KeyAction, type KeyActionByType, type KeyContext } from './keyboard';
 
 type KeyActionHandlers = HandlerMap<KeyActionByType>;
@@ -54,9 +55,7 @@ function keyActionHandlers(ctx: BoardContext): KeyActionHandlers {
       ui.selected = index;
       announceSelected(ctx);
     },
-    pickUp: ({ index }) => {
-      machine.pickUp(ctx.kindIds[index] ?? '');
-    },
+    pickUp: ({ index }) => pickUpOrRequest(ctx, ctx.kindIds[index] ?? ''),
     nudge: ({ dx }) => machine.nudge(dx),
     aim: ({ x }) => machine.aim(x),
     drop: () => {
@@ -68,6 +67,15 @@ function keyActionHandlers(ctx: BoardContext): KeyActionHandlers {
       announceSelected(ctx);
     },
   };
+}
+
+/** Enter on an empty kind that can be requested asks for more; otherwise it picks one up. */
+function pickUpOrRequest(ctx: BoardContext, kindId: string): void {
+  if (ctx.supply.canRequest(kindId)) {
+    void requestChips(ctx, kindId);
+    return;
+  }
+  ctx.machine.pickUp(kindId);
 }
 
 function keyContext(ctx: BoardContext): KeyContext {

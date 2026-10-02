@@ -1,12 +1,14 @@
 // Everything one board shares between its parts, plus small helpers that read it.
 
+import type { Supply } from '../core/supply';
 import type { ChipKindConfig, SlotConfig } from '../core/types';
 import type { World, WorldEvent } from '../core/world';
 import type { CommandMachine, HoldingState } from './commands';
 import type { RuntimeConfig } from './config';
 import type { Zone } from './input/keyboard';
+import type { StockLabelInput } from './labels';
 import type { FrameLoop } from './loop';
-import type { PlinkoOptions, Settled } from './types';
+import type { FullReason, PlinkoOptions, RequestAnswer, Settled } from './types';
 import type { Announcer } from './view/a11y';
 import type { CanvasView } from './view/canvas';
 import type { BoardDom } from './view/dom';
@@ -26,6 +28,10 @@ export interface UiState {
   /** performance.now() of each peg's latest hit. */
   pegHits: Map<number, number>;
   lastPegHit: number;
+  /** Set once the board locks, so onFull fires exactly once whichever trigger comes first. */
+  lockReason: FullReason | undefined;
+  /** Last snapshot reported to onSupplyChange, to skip reports when nothing changed. */
+  lastSupplyReport: string | undefined;
 }
 
 export interface BoardContext {
@@ -38,6 +44,9 @@ export interface BoardContext {
   chips: readonly ChipKindConfig<unknown>[];
   kindIds: readonly string[];
   world: World;
+  supply: Supply;
+  /** Requests for more chips waiting on the host, by kind. */
+  requests: Map<string, Promise<RequestAnswer>>;
   dom: BoardDom;
   view: CanvasView;
   announcer: Announcer;
@@ -61,6 +70,8 @@ export function initialUiState(): UiState {
     lockedMessage: undefined,
     pegHits: new Map(),
     lastPegHit: -Infinity,
+    lockReason: undefined,
+    lastSupplyReport: undefined,
   };
 }
 
@@ -91,8 +102,17 @@ export function refresh(ctx: BoardContext): void {
   ctx.loop.redraw();
 }
 
-/** Announces the kind selected in the tray. */
+/** A kind and its stock, for announcements. */
+export function stockOf(ctx: BoardContext, kindId: string): StockLabelInput {
+  return {
+    chip: kindOf(ctx, kindId),
+    count: ctx.supply.count(kindId),
+    canRequest: ctx.supply.canRequest(kindId),
+  };
+}
+
+/** Announces the kind selected in the tray, with how many are left. */
 export function announceSelected(ctx: BoardContext): void {
-  const chip = ctx.chips[ctx.ui.selected];
-  if (chip) ctx.announcer.say(ctx.config.labels.selected({ chip }));
+  const kindId = ctx.kindIds[ctx.ui.selected];
+  if (kindId) ctx.announcer.say(ctx.config.labels.selected(stockOf(ctx, kindId)));
 }

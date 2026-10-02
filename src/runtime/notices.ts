@@ -1,20 +1,23 @@
 // What the board does when the held-chip state machine reports a change.
 
 import type { DroppedNotice, NoticeHandlers, PickedUpNotice } from './commands';
-import { type BoardContext, callHost, kindOf } from './context';
+import { type BoardContext, callHost, kindOf, stockOf } from './context';
+import { reportIfExhausted } from './supply';
 
 export function noticeHandlers(ctx: BoardContext): NoticeHandlers {
   const { announcer, config } = ctx;
   const chip = (kindId: string) => ({ chip: kindOf(ctx, kindId) });
   const ignore = () => {};
   return {
-    ready: ignore,
     aimed: ignore,
     destroyed: ignore,
     pickedUp: (n) => onPickedUp(ctx, n),
     dropped: (n) => onDropped(ctx, n),
     locked: () => onLocked(ctx),
-    outOfChips: ({ kindId }) => announcer.say(config.labels.outOfChips(chip(kindId))),
+    outOfChips: ({ kindId }) => {
+      // A locked board has already said its last word.
+      if (!ctx.ui.lockReason) announcer.say(config.labels.outOfChips(stockOf(ctx, kindId)));
+    },
     busy: () => announcer.say(config.labels.busy),
     cancelled: ({ kindId }) => {
       ctx.ui.zone = 'tray';
@@ -35,7 +38,9 @@ function onDropped(ctx: BoardContext, { kindId, dropId, x, reloaded }: DroppedNo
   const chip = kindOf(ctx, kindId);
   callHost(ctx.options.onDrop, { chip, dropId, dropX: x });
   // With auto-reload the pickup that follows is the more useful thing to hear.
-  if (!reloaded) ctx.announcer.say(ctx.config.labels.dropped({ chip }));
+  if (reloaded) return;
+  ctx.announcer.say(ctx.config.labels.dropped({ chip }));
+  reportIfExhausted(ctx, kindId);
 }
 
 function onLocked(ctx: BoardContext): void {

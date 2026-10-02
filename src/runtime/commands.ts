@@ -3,9 +3,6 @@
 
 import type { HandlerMap } from './dispatch';
 
-export interface LoadingState {
-  name: 'loading';
-}
 export interface IdleState {
   name: 'idle';
 }
@@ -22,7 +19,7 @@ export interface DestroyedState {
   name: 'destroyed';
 }
 
-export type HeldState = LoadingState | IdleState | HoldingState | LockedState | DestroyedState;
+export type HeldState = IdleState | HoldingState | LockedState | DestroyedState;
 
 /** What the machine needs from the rest of the board. */
 export interface CommandPorts {
@@ -45,9 +42,6 @@ export interface CommandMachineInput {
   notify: (notice: Notice) => void;
 }
 
-export interface ReadyNotice {
-  type: 'ready';
-}
 export interface PickedUpNotice {
   type: 'pickedUp';
   kindId: string;
@@ -87,7 +81,6 @@ export interface DestroyedNotice {
 
 /** Every notice, keyed by its type. */
 export interface NoticeByType {
-  ready: ReadyNotice;
   pickedUp: PickedUpNotice;
   outOfChips: OutOfChipsNotice;
   aimed: AimedNotice;
@@ -114,7 +107,7 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const roundAim = (x: number) => Math.round(clamp01(x) * 1e6) / 1e6;
 
 export class CommandMachine {
-  private current: HeldState = { name: 'loading' };
+  private current: HeldState = { name: 'idle' };
   /** Where the next pickup hovers: the last aim position. */
   private lastX = 0.5;
   /** Most recently picked-up kind, for "pick up again" on the board. */
@@ -128,13 +121,6 @@ export class CommandMachine {
 
   get lastKind(): string | undefined {
     return this.lastKindId;
-  }
-
-  /** Supply is loaded; pickups are allowed from now on. */
-  ready(): void {
-    if (this.current.name !== 'loading') return;
-    this.current = { name: 'idle' };
-    this.input.notify({ type: 'ready' });
   }
 
   /** Returns false if the kind is unknown, none are left, or the board can't take commands. */

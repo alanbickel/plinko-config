@@ -1,5 +1,6 @@
 // Runtime options: defaults and validation (core options are resolved in core/options.ts).
 
+import { checkCounts, type ResolvedRefill, resolveRefill } from '../core/supply';
 import { check, inPositiveUnit } from '../core/validate';
 import { type KeyBindings, resolveKeys } from './input/keyboard';
 import { DEFAULT_LABELS, type Labels } from './labels';
@@ -13,6 +14,7 @@ export interface RuntimeConfig {
   keys: KeyBindings;
   labels: Labels;
   attribution: boolean;
+  refill: ResolvedRefill;
 }
 
 export interface RuntimeConfigInput {
@@ -30,7 +32,9 @@ export function resolveRuntimeConfig({ options, slotCount }: RuntimeConfigInput)
     keys: resolveKeys(options.keys),
     labels: { ...DEFAULT_LABELS, ...options.labels },
     attribution: options.attribution ?? true,
+    refill: resolveRefill(options.supply?.refill),
   };
+  checkCounts(options.chips);
   check(isMaxInFlight(config.maxInFlight), 'maxInFlight must be a positive integer or Infinity');
   check(inPositiveUnit(config.aimStep), 'aimStep must be a number in (0, 1]');
   check(inPositiveUnit(config.aimStepLarge), 'aimStepLarge must be a number in (0, 1]');

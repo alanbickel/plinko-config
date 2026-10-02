@@ -1,6 +1,15 @@
 // Public API.
 
 export type {
+  AddChips,
+  IntervalRefill,
+  NeverRefill,
+  OnRequestRefill,
+  RefillPolicy,
+  SetCount,
+  SupplySnapshot,
+} from './core/supply';
+export type {
   BoardConfig,
   ChipKindConfig,
   PhysicsConfig,
@@ -12,6 +21,7 @@ export { DEFAULT_KEYS, type KeyBindings } from './runtime/input/keyboard';
 export { DEFAULT_LABELS, type Labels } from './runtime/labels';
 export { DEFAULT_THEME, type Theme } from './runtime/theme';
 export type {
+  ChipDetails,
   DropDetails,
   DropOptions,
   FullDetails,
@@ -19,8 +29,11 @@ export type {
   LandDetails,
   MissDetails,
   PegHitDetails,
-  PickUpDetails,
   PlinkoBoard,
   PlinkoOptions,
+  RequestAnswer,
   Settled,
+  SupplyController,
+  SupplyOptions,
+  SupplyRequest,
 } from './runtime/types';

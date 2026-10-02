@@ -28,12 +28,20 @@ function frameState(ctx: BoardContext, alpha: number): FrameState {
     selected: ui.selected,
     zone: ui.zone,
     focused: ui.focused,
-    counts: chips.map(() => undefined), // unlimited until supply arrives (M4)
+    counts: chips.map((c) => ctx.supply.count(c.id)),
+    trayNotes: chips.map((c) => trayNote(ctx, c.id)),
     lockedMessage: ui.lockedMessage,
     pegHits: ui.pegHits,
     alpha,
     now: performance.now(),
   };
+}
+
+/** Under an empty kind: whether more can be requested, or a request is waiting. */
+function trayNote(ctx: BoardContext, kindId: string): string | undefined {
+  const { labels } = ctx.config;
+  if (ctx.requests.has(kindId)) return labels.requestPending;
+  return ctx.supply.canRequest(kindId) ? labels.requestMore : undefined;
 }
 
 /** Anything moving, waiting to be dispatched, or still lit up. */

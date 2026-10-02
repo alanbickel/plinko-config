@@ -1,6 +1,12 @@
 // Runtime debug page: the real board through the public API only, plus a dev panel.
 // Not part of the package.
-import { createPlinko, type PlinkoBoard, type PlinkoOptions } from '../src/index';
+import {
+  createPlinko,
+  type PlinkoBoard,
+  type PlinkoOptions,
+  type RefillPolicy,
+  type RequestAnswer,
+} from '../src/index';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const host = $('host');
@@ -51,6 +57,36 @@ const log = (name: string, payload: unknown) =>
 
 const input = (id: string) => $<HTMLInputElement>(id);
 const optionalNumber = (id: string) => (input(id).value ? Number(input(id).value) : undefined);
+const select = (id: string) => $<HTMLSelectElement>(id).value;
+
+const REFILLS: Record<string, () => RefillPolicy> = {
+  never: () => ({ mode: 'never' }),
+  onRequest: () => ({ mode: 'onRequest' }),
+  interval: () => ({ mode: 'interval', everyMs: Number(input('everyMs').value) || 3000 }),
+};
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** How the page answers requests for more chips; 'none' leaves the callback out. */
+const ANSWERS: Record<string, PlinkoOptions['onRequest']> = {
+  none: undefined,
+  grant: () => 'grant',
+  deny: () => 'deny',
+  slow: async (): Promise<RequestAnswer> => {
+    await delay(2000);
+    return 'grant';
+  },
+};
+
+/** Logs a request and answers it the way the panel says. */
+function onRequest(): PlinkoOptions['onRequest'] {
+  const answer = ANSWERS[select('answer')];
+  if (!answer) return undefined;
+  return (details) => {
+    log('onRequest', details.chip.id);
+    return answer(details);
+  };
+}
 
 /** Board options from the panel, with every callback logged. */
 function boardOptions(): PlinkoOptions {
@@ -58,9 +94,13 @@ function boardOptions(): PlinkoOptions {
   return {
     slots: SLOT_NAMES.slice(0, slotCount).map((label, i) => ({ id: `s${i}`, label })),
     chips: [
-      { id: 'on', label: 'On', color: '#3ec7a8' },
-      { id: 'off', label: 'Off', color: '#e0607e' },
+      { id: 'on', label: 'On', color: '#3ec7a8', count: optionalNumber('countOn') },
+      { id: 'off', label: 'Off', color: '#e0607e', count: optionalNumber('countOff') },
     ],
+    supply: { refill: REFILLS[select('refill')]?.() },
+    onRequest: onRequest(),
+    onSupplyChange: (s) => log('onSupplyChange', s.counts),
+    onExhausted: ({ chip }) => log('onExhausted', chip.id),
     physics: { seed: Number(input('seed').value) || 1 },
     autoReload: input('autoReload').checked,
     attribution: input('attribution').checked,
@@ -130,12 +170,20 @@ const calls: Record<string, () => void> = {
     liveObserver?.disconnect();
     log('destroy()', { leftoverNodesInHost: host.childNodes.length });
   },
+  addOn: () => board?.supply.add({ chip: 'on', amount: 3 }),
+  requestOn: () => {
+    board?.supply.request({ chip: 'on' }).then((answer) => log('supply.request() →', answer));
+  },
   mount,
 };
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-call]')) {
   button.addEventListener('click', () => calls[button.dataset.call ?? '']?.());
 }
-for (const id of ['autoReload', 'attribution', 'seed', 'slots', 'aimStep', 'aimStepLarge']) {
+const REMOUNT_ON_CHANGE = [
+  ...['autoReload', 'attribution', 'seed', 'slots', 'aimStep', 'aimStepLarge'],
+  ...['countOn', 'countOff', 'refill', 'everyMs', 'answer'],
+];
+for (const id of REMOUNT_ON_CHANGE) {
   $(id).addEventListener('change', mount);
 }
 $('skip').addEventListener('click', (e) => {
@@ -158,6 +206,7 @@ function renderState() {
     ['zone', el?.dataset.zone ?? '—'],
     ['focus', describeFocus(document.activeElement)],
     ['peg hits', String(pegHits)],
+    ['supply', JSON.stringify(board?.supply.get().counts ?? {})],
   ];
   $('state').replaceChildren(
     ...rows.flatMap(([k, v]) => [

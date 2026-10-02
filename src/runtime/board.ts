@@ -2,11 +2,11 @@
 
 import { PlinkoConfigError } from '../core/validate';
 import { assemble } from './assemble';
-import { refresh } from './context';
 import { createHandle } from './handle';
 import { attachInput } from './input/attach';
 import { observeHost } from './observe';
 import { fitToHost } from './sizing';
+import { startRefills, supplyChanged } from './supply';
 import type { PlinkoBoard, PlinkoOptions } from './types';
 
 export function createPlinko<CV = unknown, SV = unknown>(
@@ -16,10 +16,9 @@ export function createPlinko<CV = unknown, SV = unknown>(
   const host = resolveHost(target);
   // Internally chips and slots are opaque; the generics only type the host's callbacks.
   const ctx = assemble({ host, options: options as unknown as PlinkoOptions });
-  const teardown = [attachInput(ctx), observeHost(ctx)];
+  const teardown = [attachInput(ctx), observeHost(ctx), startRefills(ctx)];
   fitToHost(ctx);
-  ctx.machine.ready(); // unlimited supply is ready immediately; M4 makes this async
-  refresh(ctx);
+  supplyChanged(ctx); // first report; also locks at once if there are no chips at all
   return createHandle({ ctx, teardown });
 }
 

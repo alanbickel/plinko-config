@@ -11,7 +11,7 @@
 4. [Data flow](#4-data-flow)
 5. [Held-chip state machine](#5-held-chip-state-machine)
 6. [Chip lifecycle](#6-chip-lifecycle)
-7. [Dynamic: mount and supply load](#7-dynamic-mount-and-supply-load)
+7. [Dynamic: mount](#7-dynamic-mount)
 8. [Dynamic: keyboard drop to landing](#8-dynamic-keyboard-drop-to-landing)
 9. [Dynamic: the frame loop](#9-dynamic-the-frame-loop)
 10. [Architectural rules](#10-architectural-rules)
@@ -36,15 +36,13 @@ flowchart TB
             plinko["<b>plinko-config</b><br/><i>[Software system: npm library]</i><br/>Plinko board UI: physics, rendering,<br/>input, accessibility, chip supply"]:::system
         end
 
-        storage[("<b>Browser storage</b><br/><i>[External]</i><br/>localStorage / sessionStorage / cookies")]:::external
-        backend["<b>Host backend API</b><br/><i>[External, optional]</i><br/>Persists preferences and/or chip supply"]:::external
+        backend["<b>Host backend API</b><br/><i>[External, optional]</i><br/>Persists preferences, and chip<br/>counts if the host wants"]:::external
         at["<b>Assistive technology</b><br/><i>[External]</i><br/>Screen readers"]:::external
 
         visitor -- "picks up, aims, drops chips" --> plinko
         dev -- "configures options and callbacks" --> plinko
         plinko -- "onLand({ chip, slot }): host applies preference" --> backend
-        plinko -- "reads/writes chip supply" --> storage
-        plinko -. "custom StorageAdapter" .-> backend
+        plinko -. "onSupplyChange: host may save counts" .-> backend
         plinko -- "live-region announcements" --> at
         at -- "speaks" --> visitor
     end
@@ -58,7 +56,7 @@ flowchart TB
 
 **Notes**
 
-- The library never persists *preferences*. The host does that in `onLand`. The library only persists its own *chip supply*.
+- **The library never persists anything.** The host owns all state: the library reports it through callbacks (`onLand`, `onSupplyChange`) and accepts it through options (`chips[].count`). A host that wants chip counts to survive a reload saves the `onSupplyChange` snapshot and passes it back as `count` (see the README).
 
 ---
 
@@ -84,7 +82,6 @@ flowchart TB
             end
 
             dom["<b>Host DOM subtree</b><br/><i>[Container: DOM]</i><br/>Mount target element. Library appends<br/>one wrapper: canvas, live region,<br/>attribution link"]:::external
-            storage[("<b>Web Storage / cookies</b><br/><i>[Container: browser store]</i>")]:::external
         end
 
         backend["<b>Host backend API</b><br/><i>[External, optional]</i>"]:::external
@@ -95,9 +92,7 @@ flowchart TB
         element -- "wraps" --> core
         visitor -- "keyboard / pointer" --> dom
         core -- "renders into own wrapper" --> dom
-        core -- "supply load / save" --> storage
-        hostApp -- "save preferences" --> backend
-        core -. "custom StorageAdapter" .-> backend
+        hostApp -- "save preferences<br/>(and counts, if wanted)" --> backend
     end
 
     classDef person fill:#0b3d6e,stroke:#5b9bd5,color:#ffffff
@@ -140,6 +135,7 @@ flowchart TB
             cmds["<b>Command state machine</b><br/><i>commands.ts</i><br/>pickUp · aim · nudge · drop · cancel"]:::comp
             board["<b>Board controller</b><br/><i>board.ts · assemble.ts · handle.ts</i><br/>createPlinko(); public handle;<br/>wiring; host callbacks"]:::comp
             loop["<b>Frame loop</b><br/><i>loop.ts</i><br/>RAF + 120 Hz fixed step;<br/>idle sleep; visibility pause"]:::comp
+            supplyRt["<b>Supply driver</b><br/><i>supply.ts · lock.ts</i><br/>refill timer; requests;<br/>exhaustion lock"]:::comp
             subgraph views[" "]
                 direction LR
                 canvasView["<b>Canvas view</b><br/><i>view/canvas.ts</i><br/>pegs, slots, chips, piles, tray"]:::comp
@@ -157,11 +153,8 @@ flowchart TB
             world["<b>Physics world</b><br/><i>world.ts</i><br/>step; spatial hash;<br/>landing + stuck detection"]:::comp
             rng["<b>Seeded RNG</b><br/><i>rng.ts</i>"]:::comp
             vendor["<b>Vendored LittleJS</b><br/><i>vendor/littlejs</i>"]:::comp
-            supply["<b>Supply</b><br/><i>supply.ts</i><br/>reserve / commit / release;<br/>refill policies"]:::comp
-            storage["<b>Storage adapters</b><br/><i>storage.ts</i>"]:::comp
+            supply["<b>Supply</b><br/><i>supply.ts</i><br/>counts; reserve / commit / release;<br/>refill caps"]:::comp
         end
-
-        storeExt[("<b>Storage backend</b><br/><i>[Browser / host API]</i>")]:::external
 
         hostApp <-- "options, handle calls ⇄ callbacks" --> board
         domIn --> kb
@@ -183,10 +176,11 @@ flowchart TB
         cmds -- "reserve / commit / release" --> supply
         loop -- "step × n" --> world
         world -. "pegHit, landed, missed, full" .-> board
-        supply -. "onSupplyChange" .-> board
+        board --> supplyRt
+        supplyRt -- "refillOnce · grant" --> supply
+        supplyRt -. "onSupplyChange, onRequest" .-> hostApp
         world --> rng
         world --> vendor
-        supply -- "load / save" --> storage --> storeExt
     end
 
     classDef comp fill:#9ccbf7,stroke:#5b9bd5,color:#0d1117
@@ -209,8 +203,8 @@ flowchart TB
 | Canvas / DOM views | Pixels and nodes, derived from state | Mutate state |
 | Announcer | Wording (via `labels`) and throttling | Decide *when* something happened |
 | Physics world | Bodies, collisions, events | Know about supply, DOM, or callbacks |
-| Supply | Counts and policies | Know where it's stored |
-| Storage adapters | I/O and failure fallback | Interpret counts |
+| Supply | Counts, reservations, refill caps (unlimited is `Infinity`) | Know about time, timers, or storage |
+| Supply driver | Refill timer, request flow, reporting changes, locking when exhausted | Count chips itself |
 
 ---
 
@@ -231,7 +225,6 @@ flowchart TB
 
         H["Host app"]:::external
         U["Site visitor"]:::external
-        S[("Browser storage /<br/>host API")]:::external
 
         P1(["1 · Resolve options"]):::proc
         P2(["2 · Build layout"]):::proc
@@ -242,7 +235,7 @@ flowchart TB
         D1[("D1 · ResolvedOptions")]:::store
         D2[("D2 · Layout geometry<br/>pegs, walls, slots")]:::store
         D3[("D3 · Board state<br/>held chip, aim x, chips in flight")]:::store
-        D4[("D4 · Supply state<br/>counts, reserved, lastRefillAt")]:::store
+        D4[("D4 · Supply state<br/>counts, in hand, caps")]:::store
 
         H -- "PlinkoOptions" --> P1
         P1 --> D1
@@ -256,8 +249,7 @@ flowchart TB
 
         P4 -- "reserve / commit / release" --> P9
         P9 --> D4
-        P9 <-- "SupplyState<br/>load · debounced save" --> S
-        P9 -- "onSupplyChange, onExhausted" --> H
+        P9 -- "onSupplyChange, onExhausted,<br/>onRequest ⇄ grant / deny" --> H
 
         P4 -- "held chip, aim x,<br/>spawned ChipBody" --> D3
     end
@@ -316,7 +308,7 @@ flowchart TB
     style canvas fill:#161b22,stroke:#161b22
 ```
 
-P8 (announce) also receives "picked up / dropped / cancelled" from P4 and "low / exhausted / refilled" from P9. Those flows are left off both diagrams to keep them readable.
+P8 (announce) also receives "picked up / dropped / cancelled" from P4 and "out of chips / requesting / granted / denied" from P9. Those flows are left off both diagrams to keep them readable.
 
 **Key data shapes**
 
@@ -327,12 +319,12 @@ P8 (announce) also receives "picked up / dropped / cancelled" from P4 and "low /
 | `WorldEvent` | `{type:'pegHit', chip, pegIndex, speed} \| {type:'landed', chip, slotIndex} \| {type:'missed', chip} \| {type:'full', reason:'slots'\|'overflow'}` | World → controller |
 | Outcome callbacks | One object each: `onLand({ chip, slot, …details })` · `onMiss({ chip, …details })` · `onFull({ reason })`; `details = { dropId, dropX, pegHits, durationMs, seed }` | Controller → host, announcer |
 | `Settled` | `{ dropId }`: what `drop()` resolves with. Only "no longer in flight"; callbacks are the single source of outcomes. | Controller → host |
-| `SupplyState` | `{ v:1, counts, lastRefillAt? }` | Supply ↔ storage |
+| `SupplySnapshot` | `{ counts: { [kindId]: number } }`; unlimited is `Infinity`; a chip in hand counts as used | Supply → host (`onSupplyChange`) |
 
 **Trust boundaries**
 
 - Host options are validated once, in P1. Bad config throws a descriptive error at `createPlinko`, never mid-game.
-- Storage data is untrusted: parsed defensively and clamped against the configured kinds in P9.
+- Request answers are untrusted: anything other than `'grant'`, including a thrown or rejected `onRequest`, counts as denied.
 - Host callbacks are untrusted code: wrapped in try/catch, and errors are logged so a broken `onLand` can't freeze the board.
 
 ---
@@ -350,8 +342,7 @@ flowchart TB
         direction TB
 
 
-        start((" ")):::start -- "mount" --> Loading(["Loading"]):::state
-        Loading -- "supply loaded" --> Idle(["Idle"]):::state
+        start((" ")):::start -- "mount" --> Idle(["Idle"]):::state
         Idle -- "pickUp(kind)" --> canPick{"reserve?"}:::choice
         canPick -- "ok" --> Holding(["Holding"]):::state
         canPick -- "none left" --> Idle
@@ -361,7 +352,7 @@ flowchart TB
         Dropping -- "commit + spawn" --> reload{"reload?"}:::choice
         reload -- "autoReload and reserve ok" --> Holding
         reload -- "otherwise" --> Idle
-        Idle -- "board full" --> Locked(["Locked"]):::state
+        Idle -- "board full or<br/>supply exhausted" --> Locked(["Locked"]):::state
         Holding -- "board full<br/>(chip back to tray)" --> Locked
     end
 
@@ -374,12 +365,12 @@ flowchart TB
 | Transition | Guard / side effects |
 |---|---|
 | `Idle → Holding` | `supply.reserve(kind)` succeeds. Announce pickup. Keyboard zone moves to the board. |
-| `Idle → Idle` (none left) | Announce "Out of *kind* chips." If `refill: 'onRequest'`, the tray offers a "request more chips" action. |
+| `Idle → Idle` (none left) | Announce "Out of *kind* chips." With refill mode `onRequest`, the tray shows "request more", and Enter on the empty kind asks the host (`onRequest` → `'grant'` / `'deny'`, possibly async; no callback means granted). |
 | `Holding → Holding` | `aim(x)` / `nudge(dx)`, clamped to the board's drop range. |
 | `Holding → Idle` (cancel) | `Esc`, or pointer released off the board. `supply.release`. Keyboard zone returns to the tray. |
 | `Holding → Dropping` | Only if `inFlight < maxInFlight`; otherwise stay in `Holding` and announce "wait." |
 | `Dropping → …` | Commit the reservation, spawn the chip in the world, fire `onDrop`. With `autoReload`, reserve the next chip of the same kind at the same x. |
-| `Idle` / `Holding` → `Locked` | The world reports `full`. A held chip goes back to the tray (`supply.release`). Pending landings are announced, then the lock message. Every later command is refused; `drop()` rejects. In-flight chips finish normally. |
+| `Idle` / `Holding` → `Locked` | The world reports `full` (`slots` / `overflow`), or the supply is exhausted (every kind at 0, none in hand, refill mode `never`). `onFull` fires once, with the first reason. A held chip goes back to the tray (`supply.release`). Pending landings are announced, then the lock message. Every later command is refused; `drop()` rejects. In-flight chips finish normally. |
 | any → destroyed | `destroy()`: release any reservation, flush saves, tear down. Pending `drop()` promises resolve, since their chips are gone. |
 
 The canvas is a single tab stop. Inside it, a *keyboard zone* (tray or board) is tracked separately from this machine. It only decides how keys are interpreted: tray keys select a kind and produce `pickUp`, and board keys produce `aim`/`nudge`/`drop`/`cancel`. Tab and modified keys are never handled, so focus can always leave. Nudge sizes are `aimStep` / `aimStepLarge` (fractions of the drop width; defaults ¼ slot and 1 slot). The wrapper exposes the current state and zone as `data-state` / `data-zone`.
@@ -388,7 +379,7 @@ The canvas is a single tab stop. Inside it, a *keyboard zone* (tray or board) is
 
 - At most one *held* chip. Any number of *in-flight* chips (up to `maxInFlight`).
 - A reservation exists if and only if the state is `Holding`.
-- `destroy()` from any state releases reservations and flushes pending supply saves.
+- `destroy()` from any state releases reservations and stops refill timers. Requests still waiting on the host are ignored when they answer.
 
 ---
 
@@ -431,7 +422,7 @@ flowchart LR
 
 ---
 
-## 7. Dynamic: mount and supply load
+## 7. Dynamic: mount
 
 **Legend:** $\color{#9ccbf7}{\blacksquare}$ participant · $\color{#ffe7a0}{\blacksquare}$ note · → call / message · ⇢ return / async result · ① step order
 
@@ -445,30 +436,24 @@ sequenceDiagram
     participant O as Options + Layout
     participant V as Views (DOM + canvas)
     participant Sup as Supply
-    participant St as Storage adapter
     participant L as Frame loop
     end
 
     Host->>B: createPlinko(target, options)
     B->>B: resolve target (element or selector)
-    B->>O: resolve + validate options
-    O-->>B: ResolvedOptions, Layout
+    B->>O: resolve + validate options (incl. chip counts, refill policy)
+    O-->>B: resolved options, Layout
+    B->>Sup: new Supply(counts, refill)
     B->>V: append wrapper, canvas, live region, attribution
-    B->>V: observe size (ResizeObserver), visibility (IntersectionObserver)
-    B->>Sup: init(chips, supplyConfig)
-    Sup->>St: load(key)
-    Note over V,St: tray in loading state, pickup disabled
-    B->>L: render one static frame, then sleep
-    B-->>Host: PlinkoBoard handle (synchronous)
-    St-->>Sup: SupplyState or null or error
-    Sup->>Sup: clamp to configured kinds, or on error use memory and warn
-    Sup->>B: ready(snapshot)
-    B->>V: enable tray, show counts
+    B->>V: listen for keys and focus, observe size and visibility
+    B->>B: start the refill timer (interval policy only)
+    B->>L: fit to host, draw one frame, then sleep
     B->>Host: onSupplyChange(snapshot)
+    Note over B,Sup: every kind at 0 and refill mode never, so it locks at once (onFull, reason exhausted)
+    B-->>Host: PlinkoBoard handle
 ```
 
-
-`createPlinko` returns synchronously even when the storage adapter is async, so host code stays simple. Readiness shows up through the tray and `onSupplyChange`.
+`createPlinko` is synchronous and the board is usable immediately: there is nothing to load. To restore chip counts after a reload, the host passes saved counts as `chips[].count`.
 
 **Sizing.** The board fills the host's width. If the host has a height of its own, the board also fits inside it, centred. To tell the two apart, the board collapses its canvas for a moment and measures what height the host keeps. Both the wrapper and the host are observed, so the board refits whenever either changes.
 

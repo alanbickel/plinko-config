@@ -2,7 +2,8 @@
 
 import { type BoardContext, heldChip } from './context';
 import { applyPause } from './observe';
-import type { DropOptions, PlinkoBoard, Settled } from './types';
+import { requestChips, supplyChanged } from './supply';
+import type { DropOptions, PlinkoBoard, Settled, SupplyController } from './types';
 
 export interface HandleInput {
   ctx: BoardContext;
@@ -19,6 +20,7 @@ export function createHandle({ ctx, teardown }: HandleInput): PlinkoBoard {
     aim: (x) => machine.aim(x),
     cancel: () => machine.cancel(),
     drop: (options = {}) => drop(ctx, options),
+    supply: supplyController(ctx),
     pause: () => setPausedByHost(ctx, true),
     resume: () => setPausedByHost(ctx, false),
     destroy: () => {
@@ -26,6 +28,22 @@ export function createHandle({ ctx, teardown }: HandleInput): PlinkoBoard {
       destroyed = true;
       destroyBoard({ ctx, teardown });
     },
+  };
+}
+
+/** Host overrides go through the same reporting (and exhaustion check) as everything else. */
+function supplyController(ctx: BoardContext): SupplyController {
+  return {
+    get: () => ctx.supply.snapshot(),
+    set: (update) => {
+      ctx.supply.set(update);
+      supplyChanged(ctx);
+    },
+    add: (update) => {
+      ctx.supply.add(update);
+      supplyChanged(ctx);
+    },
+    request: ({ chip }) => requestChips(ctx, chip),
   };
 }
 

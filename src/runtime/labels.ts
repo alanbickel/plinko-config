@@ -8,6 +8,14 @@ export interface LandingLabelInput extends ChipLabelInput {
   slot: SlotConfig<unknown>;
 }
 
+/** A kind and how many are left. */
+export interface StockLabelInput extends ChipLabelInput {
+  /** Chips left; Infinity when unlimited. */
+  count: number;
+  /** Empty, and more can be requested. */
+  canRequest: boolean;
+}
+
 export interface BatchLabelInput {
   landed: LandingLabelInput[];
   /** How many chips in the batch missed. */
@@ -23,7 +31,7 @@ export interface Labels {
   /** Read once when the board gets focus (aria-describedby). */
   instructions: string;
   /** Tray selection changed, or the tray zone was entered. */
-  selected: ChipLabel;
+  selected: (input: StockLabelInput) => string;
   pickedUp: ChipLabel;
   cancelled: ChipLabel;
   dropped: ChipLabel;
@@ -31,7 +39,15 @@ export interface Labels {
   missed: ChipLabel;
   /** Several settled close together (rapid fire), batched into one announcement. */
   settledBatch: (input: BatchLabelInput) => string;
-  outOfChips: ChipLabel;
+  outOfChips: (input: StockLabelInput) => string;
+  /** A request for more chips was sent to the host. */
+  requesting: ChipLabel;
+  granted: ChipLabel;
+  denied: ChipLabel;
+  /** Shown in the tray under an empty kind that can be requested. */
+  requestMore: string;
+  /** Shown in the tray while a request waits for the host. */
+  requestPending: string;
   /** Too many chips in flight. */
   busy: string;
   /** The board is full; shown on the board and announced. */
@@ -44,7 +60,7 @@ export const DEFAULT_LABELS: Labels = {
   instructions:
     'Left and right arrows choose a chip; Enter picks it up. Then arrows aim, Shift with arrows ' +
     'moves faster, Home and End jump to the edges, Enter drops, Escape puts the chip back.',
-  selected: ({ chip }) => `${chip.label} chip.`,
+  selected: (input) => `${input.chip.label} chip${stock(input)}.`,
   pickedUp: ({ chip }) =>
     `Picked up ${article(chip.label)} ${chip.label} chip. Arrows to aim, Enter to drop.`,
   cancelled: ({ chip }) => `Put the ${chip.label} chip back.`,
@@ -56,10 +72,24 @@ export const DEFAULT_LABELS: Labels = {
     if (missed) parts.push(`${missed} missed`);
     return `${landed.length + missed} chips settled: ${parts.join(', ')}.`;
   },
-  outOfChips: ({ chip }) => `Out of ${chip.label} chips.`,
+  outOfChips: ({ chip, canRequest }) => `Out of ${chip.label} chips.${requestHint(canRequest)}`,
+  requesting: ({ chip }) => `Requesting more ${chip.label} chips…`,
+  granted: ({ chip }) => `Request granted: more ${chip.label} chips.`,
+  denied: ({ chip }) => `Request for more ${chip.label} chips was denied.`,
+  requestMore: 'Enter: request more',
+  requestPending: 'Requesting…',
   busy: 'Too many chips in the air. Wait a moment.',
   locked: 'Sorry, you can no longer make any changes.',
   attribution: 'Powered by LittleJS',
 };
 
 const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a');
+
+const requestHint = (canRequest: boolean) => (canRequest ? ' Press Enter to request more.' : '');
+
+/** ", 3 left" / ", none left" (plus how to get more) / nothing when unlimited. */
+function stock({ count, canRequest }: StockLabelInput): string {
+  if (count === Infinity) return '';
+  if (count > 0) return `, ${count} left`;
+  return canRequest ? ', none left. Press Enter to request more' : ', none left';
+}

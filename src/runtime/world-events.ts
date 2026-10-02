@@ -4,6 +4,7 @@ import type { ChipBody, LandedEvent, PegHitEvent, WorldEventByType } from '../co
 import { STEP } from '../core/world';
 import { type BoardContext, callHost, kindOf } from './context';
 import { dispatchByType, type HandlerMap } from './dispatch';
+import { lockBoard } from './lock';
 import type { MissDetails } from './types';
 
 export type WorldEventHandlers = HandlerMap<WorldEventByType>;
@@ -13,10 +14,7 @@ export function worldEventHandlers(ctx: BoardContext): WorldEventHandlers {
     pegHit: (e) => onPegHit(ctx, e),
     landed: (e) => onLanded(ctx, e),
     missed: ({ chip }) => onMissed(ctx, chip),
-    full: ({ reason }) => {
-      callHost(ctx.options.onFull, { reason });
-      ctx.machine.lock();
-    },
+    full: ({ reason }) => lockBoard(ctx, reason),
   };
 }
 

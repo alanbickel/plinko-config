@@ -12,9 +12,12 @@ const TOP = 0.9; // space above the drop line for the held chip
 const WALL = 0.12; // drawn wall thickness (the physics walls are thicker)
 const FLOOR = 0.15;
 const LABEL_H = 0.7; // slot label strip
-const TRAY_H = 1.7;
+const TRAY_H = 1.95;
 const TRAY_CHIP_R = 0.32;
 const FONT = '0.26px system-ui, sans-serif';
+const NOTE_FONT = '0.2px system-ui, sans-serif';
+/** Opacity of an empty kind in the tray. */
+const EMPTY_ALPHA = 0.35;
 const BANNER_FONT = '600 0.34px system-ui, sans-serif';
 /** How long a peg stays lit after a hit. */
 export const PEG_FLASH_MS = 120;
@@ -32,8 +35,10 @@ export interface FrameState {
   selected: number;
   zone: Zone;
   focused: boolean;
-  /** Chips left per kind; undefined means unlimited. */
-  counts: readonly (number | undefined)[];
+  /** Chips left per kind; Infinity when unlimited. */
+  counts: readonly number[];
+  /** Small print under each kind in the tray (e.g. how to request more). */
+  trayNotes: readonly (string | undefined)[];
   /** Message shown over the board once it's full. */
   lockedMessage: string | undefined;
   /** performance.now() of each peg's latest hit. */
@@ -213,11 +218,17 @@ class Painter {
       r: TRAY_CHIP_R,
     };
     const selected = index === frame.selected;
+    const count = frame.counts[index] ?? 0;
+    g.globalAlpha = count === 0 ? EMPTY_ALPHA : 1;
     this.chip(at, kind.id);
+    g.globalAlpha = 1;
     if (selected) this.drawSelection({ at, frame });
-    const count = frame.counts[index];
     this.textStyle(FONT, selected ? theme.text : theme.mutedText);
-    g.fillText(this.fit(`${kind.label} ×${count ?? '∞'}`, cell * 0.95), at.x, at.y + 0.65);
+    g.fillText(this.fit(`${kind.label} ×${formatCount(count)}`, cell * 0.95), at.x, at.y + 0.6);
+    const note = frame.trayNotes[index];
+    if (!note) return;
+    this.textStyle(NOTE_FONT, theme.mutedText);
+    g.fillText(this.fit(note, cell * 0.95), at.x, at.y + 0.95);
   }
 
   /** The selected tray kind: a focus ring while the tray has focus, a quiet ring otherwise. */
@@ -306,3 +317,5 @@ function interpolate(chip: ChipBody, alpha: number): Point {
 }
 
 const grow = (c: Circle, by: number): Circle => ({ ...c, r: c.r + by });
+
+const formatCount = (n: number): string => (n === Infinity ? '∞' : String(n));

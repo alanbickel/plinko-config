@@ -68,24 +68,15 @@ function setup(opts: SetupInput = {}): Harness {
   };
 }
 
-const ready = (t: Harness): Harness => {
-  t.machine.ready();
-  t.notices.length = 0;
-  return t;
-};
-
 describe('CommandMachine', () => {
-  it('starts loading and ignores commands until ready', () => {
+  it('starts idle, with nothing to report', () => {
     const t = setup();
-    expect(t.machine.state.name).toBe('loading');
-    expect(t.machine.pickUp('on')).toBe(false);
-    t.machine.ready();
     expect(t.machine.state.name).toBe('idle');
-    expect(t.notices).toEqual([{ type: 'ready' }]);
+    expect(t.notices).toEqual([]);
   });
 
   it('picks up, aims, and drops', () => {
-    const t = ready(setup());
+    const t = setup();
     expect(t.machine.pickUp('on')).toBe(true);
     expect(t.machine.state).toEqual({ name: 'holding', kindId: 'on', x: 0.5 });
     t.machine.nudge(0.1);
@@ -99,7 +90,7 @@ describe('CommandMachine', () => {
   });
 
   it('clamps aim to [0, 1] and ignores no-op and non-finite aims', () => {
-    const t = ready(setup());
+    const t = setup();
     t.machine.pickUp('on');
     t.machine.aim(5);
     t.machine.nudge(1);
@@ -113,7 +104,7 @@ describe('CommandMachine', () => {
   });
 
   it('remembers the last aim position for the next pickup', () => {
-    const t = ready(setup());
+    const t = setup();
     t.machine.pickUp('on');
     t.machine.aim(0.2);
     t.machine.drop();
@@ -123,7 +114,7 @@ describe('CommandMachine', () => {
   });
 
   it('cancel returns the chip to the tray', () => {
-    const t = ready(setup({ stock: { on: 1 } }));
+    const t = setup({ stock: { on: 1 } });
     t.machine.pickUp('on');
     expect(t.stock.on).toBe(0);
     t.machine.cancel();
@@ -133,20 +124,20 @@ describe('CommandMachine', () => {
   });
 
   it('reports out of chips and stays idle', () => {
-    const t = ready(setup({ stock: { on: 0 } }));
+    const t = setup({ stock: { on: 0 } });
     expect(t.machine.pickUp('on')).toBe(false);
     expect(t.machine.state.name).toBe('idle');
     expect(t.notices).toEqual([{ type: 'outOfChips', kindId: 'on' }]);
   });
 
   it('rejects unknown kinds', () => {
-    const t = ready(setup());
+    const t = setup();
     expect(t.machine.pickUp('nope')).toBe(false);
     expect(t.notices).toEqual([]);
   });
 
   it('switching kinds while holding releases the first', () => {
-    const t = ready(setup({ stock: { on: 1, off: 1 } }));
+    const t = setup({ stock: { on: 1, off: 1 } });
     t.machine.pickUp('on');
     expect(t.machine.pickUp('off')).toBe(true);
     expect(t.stock).toMatchObject({ on: 1, off: 0 });
@@ -155,7 +146,7 @@ describe('CommandMachine', () => {
   });
 
   it('auto-reloads the same kind at the same x', () => {
-    const t = ready(setup({ autoReload: true, stock: { on: 2 } }));
+    const t = setup({ autoReload: true, stock: { on: 2 } });
     t.machine.pickUp('on');
     t.machine.aim(0.3);
     t.machine.drop();
@@ -171,7 +162,7 @@ describe('CommandMachine', () => {
   });
 
   it('waits when maxInFlight is reached', () => {
-    const t = ready(setup({ maxInFlight: 2 }));
+    const t = setup({ maxInFlight: 2 });
     t.machine.pickUp('on');
     t.setFlying(2);
     expect(t.machine.drop()).toBeUndefined();
@@ -182,7 +173,7 @@ describe('CommandMachine', () => {
   });
 
   it('lock returns a held chip to the tray and refuses everything after', () => {
-    const t = ready(setup({ stock: { on: 1 } }));
+    const t = setup({ stock: { on: 1 } });
     t.machine.pickUp('on');
     t.machine.lock();
     expect(t.stock.on).toBe(1);
@@ -199,13 +190,13 @@ describe('CommandMachine', () => {
   });
 
   it('lock while idle has nothing to return', () => {
-    const t = ready(setup());
+    const t = setup();
     t.machine.lock();
     expect(t.notices).toEqual([{ type: 'locked', returnedKindId: undefined }]);
   });
 
   it('destroy releases a held chip, once', () => {
-    const t = ready(setup({ stock: { on: 1 } }));
+    const t = setup({ stock: { on: 1 } });
     t.machine.pickUp('on');
     t.machine.destroy();
     t.machine.destroy();

@@ -51,7 +51,7 @@ test('plays entirely by keyboard, with announcements', async ({ page }) => {
   expect(await focusIsCanvas(page)).toBe(true);
 
   await page.keyboard.press('ArrowRight');
-  await expect(lastAnnouncement(page)).toHaveText('Off chip.');
+  await expect(lastAnnouncement(page)).toHaveText('Off chip, 5 left.');
 
   await page.keyboard.press('Enter');
   await expect(board(page)).toHaveAttribute('data-state', 'holding');
@@ -75,6 +75,18 @@ test('Tab always leaves the board, even while holding a chip', async ({ page }) 
   await expect(board(page)).toHaveAttribute('data-state', 'holding');
   await page.keyboard.press('Tab');
   expect(await focusIsCanvas(page)).toBe(false);
+});
+
+test('runs out of chips and requests more, by keyboard', async ({ page }) => {
+  await page.locator('#countOn').fill('1');
+  await page.locator('#countOn').blur(); // the browser's change event remounts: 1 On chip, refill onRequest
+  await canvas(page).focus();
+  await page.keyboard.press('Enter'); // pick up the only On chip
+  await page.keyboard.press('Enter'); // drop it
+  await expect(lastAnnouncement(page)).toHaveText('Out of On chips. Press Enter to request more.');
+  await page.keyboard.press('Enter'); // request (no callback on the page: granted)
+  await expect(lastAnnouncement(page)).toHaveText('Request granted: more On chips.');
+  await expect(page.locator('#state')).toContainText('"on":1');
 });
 
 test('destroy() leaves nothing behind', async ({ page }) => {

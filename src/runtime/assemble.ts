@@ -2,13 +2,15 @@
 
 import { buildLayout } from '../core/layout';
 import { resolveCoreOptions } from '../core/options';
+import { Supply } from '../core/supply';
 import { World } from '../core/world';
-import { CommandMachine, type Notice } from './commands';
+import { CommandMachine, type Notice, type NoticeByType } from './commands';
 import { resolveRuntimeConfig } from './config';
 import { type BoardContext, initialUiState, refresh } from './context';
 import { dispatchByType } from './dispatch';
 import { createLoop } from './frame';
 import { noticeHandlers } from './notices';
+import { supplyChanged } from './supply';
 import { resolveTheme } from './theme';
 import type { PlinkoOptions } from './types';
 import { Announcer } from './view/a11y';
@@ -49,6 +51,8 @@ function createBase({ host, options }: AssembleInput): BaseContext {
     chips,
     kindIds: chips.map((c) => c.id),
     world: new World({ layout, physics: core.physics }),
+    supply: new Supply({ kinds: chips, refill: config.refill }),
+    requests: new Map(),
     dom,
     view: new CanvasView({
       canvas: dom.canvas,
@@ -69,9 +73,9 @@ function createMachine(ctx: BoardContext): CommandMachine {
   const handlers = noticeHandlers(ctx);
   return new CommandMachine({
     ports: {
-      reserve: () => true, // unlimited supply until M4
-      commit: () => {},
-      release: () => {},
+      reserve: (kindId) => ctx.supply.reserve(kindId),
+      commit: (kindId) => ctx.supply.commit(kindId),
+      release: (kindId) => ctx.supply.release(kindId),
       inFlight: () => ctx.world.flying.length,
       spawn: (kindId, x) => ctx.world.spawn({ kindId, x, seed: ctx.ui.pendingSeed }).id,
     },
@@ -80,10 +84,18 @@ function createMachine(ctx: BoardContext): CommandMachine {
     autoReload: ctx.config.autoReload,
     notify: (notice: Notice) => {
       dispatchByType(handlers, notice);
-      refresh(ctx);
+      (CHANGES_SUPPLY.has(notice.type) ? supplyChanged : refresh)(ctx);
     },
   });
 }
+
+/** Notices after which chip counts may have changed (a chip taken, spent, or put back). */
+const CHANGES_SUPPLY: ReadonlySet<keyof NoticeByType> = new Set<keyof NoticeByType>([
+  'pickedUp',
+  'cancelled',
+  'dropped',
+  'locked',
+]);
 
 function prefersReducedMotion(win: Window | null): boolean {
   return win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;

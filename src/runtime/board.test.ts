@@ -44,6 +44,8 @@ beforeEach(() => {
     toFake: [
       'setTimeout',
       'clearTimeout',
+      'setInterval',
+      'clearInterval',
       'requestAnimationFrame',
       'cancelAnimationFrame',
       'performance',
@@ -276,6 +278,147 @@ describe('full board', () => {
     await expect(b.drop({ chip: 'on' })).rejects.toThrow(/can't pick up/);
     press(b, 'Enter');
     expect(liveText(b)).toBe('Sorry, you can no longer make any changes.');
+  });
+});
+
+describe('supply', () => {
+  interface Counts {
+    on: number;
+    off: number;
+  }
+  /** A board whose kinds have these counts. */
+  const stocked = (counts: Counts, extra: Partial<PlinkoOptions> = {}) =>
+    mount({
+      chips: [
+        { id: 'on', label: 'On', count: counts.on },
+        { id: 'off', label: 'Off', count: counts.off },
+      ],
+      ...extra,
+    });
+  /** Lets pending promises (e.g. an async onRequest) finish. */
+  const flush = () => vi.advanceTimersByTimeAsync(0);
+
+  it('reports counts on mount, counts a chip in hand as used, and gives it back on Escape', () => {
+    const onSupplyChange = vi.fn();
+    stocked({ on: 2, off: Infinity }, { onSupplyChange });
+    const b = boards[0] as PlinkoBoard;
+    expect(onSupplyChange).toHaveBeenLastCalledWith({ counts: { on: 2, off: Infinity } });
+    press(b, 'Enter');
+    expect(b.supply.get()).toEqual({ counts: { on: 1, off: Infinity } });
+    press(b, 'Escape');
+    expect(onSupplyChange).toHaveBeenLastCalledWith({ counts: { on: 2, off: Infinity } });
+    expect(onSupplyChange).toHaveBeenCalledTimes(3);
+  });
+
+  it('announces how many are left when choosing a kind', () => {
+    const b = stocked({ on: 3, off: 0 });
+    press(b, 'ArrowRight');
+    expect(liveText(b)).toBe('Off chip, none left.');
+    press(b, 'ArrowLeft');
+    expect(liveText(b)).toBe('On chip, 3 left.');
+  });
+
+  it('spends dropped chips and reports the last one', () => {
+    const onExhausted = vi.fn();
+    const b = stocked({ on: 2, off: Infinity }, { onExhausted });
+    press(b, 'Enter');
+    press(b, 'Enter'); // drop; auto-reload picks up the last one
+    expect(onExhausted).not.toHaveBeenCalled();
+    press(b, 'Enter'); // drop the last one
+    expect(onExhausted).toHaveBeenCalledWith({ chip: expect.objectContaining({ id: 'on' }) });
+    expect(liveText(b)).toBe('Out of On chips.');
+    expect(b.supply.get().counts.on).toBe(0);
+  });
+
+  it('locks when every chip is spent and none can come back', () => {
+    const onFull = vi.fn();
+    const b = stocked({ on: 1, off: 0 }, { onFull });
+    press(b, 'Enter');
+    press(b, 'Enter');
+    expect(onFull).toHaveBeenCalledWith({ reason: 'exhausted' });
+    expect(b.element.dataset.state).toBe('locked');
+    expect(liveText(b)).toBe('Sorry, you can no longer make any changes.');
+  });
+
+  it('locks straight away when there are no chips at all', () => {
+    const onFull = vi.fn();
+    const b = stocked({ on: 0, off: 0 }, { onFull });
+    expect(onFull).toHaveBeenCalledWith({ reason: 'exhausted' });
+    expect(b.element.dataset.state).toBe('locked');
+  });
+
+  it('host overrides change counts, report, and can exhaust the board', () => {
+    const onSupplyChange = vi.fn();
+    const b = stocked({ on: 1, off: 1 }, { onSupplyChange });
+    b.supply.add({ chip: 'on', amount: 4 });
+    b.supply.set({ chip: 'off', count: 0 });
+    expect(onSupplyChange).toHaveBeenLastCalledWith({ counts: { on: 5, off: 0 } });
+    b.supply.set({ chip: 'on', count: 0 });
+    expect(b.element.dataset.state).toBe('locked');
+  });
+
+  it('refills on an interval, up to the starting count', () => {
+    const b = stocked(
+      { on: 2, off: 0 },
+      { supply: { refill: { mode: 'interval', everyMs: 1000 } } },
+    );
+    b.supply.set({ chip: 'on', count: 0 });
+    run(1000);
+    expect(b.supply.get().counts.on).toBe(1);
+    run(5000);
+    expect(b.supply.get().counts).toEqual({ on: 2, off: 0 }); // off started at 0: its cap
+    expect(b.element.dataset.state).toBe('idle'); // refillable, so never exhausted
+  });
+
+  describe('requests', () => {
+    const onRequest = { supply: { refill: { mode: 'onRequest' } } } as const;
+
+    it('Enter on an empty kind asks the host, then refills on grant', async () => {
+      const ask = vi.fn(async () => 'grant' as const);
+      const b = stocked({ on: 2, off: 0 }, { ...onRequest, onRequest: ask });
+      press(b, 'ArrowRight');
+      expect(liveText(b)).toBe('Off chip, none left. Press Enter to request more.');
+      press(b, 'Enter');
+      expect(liveText(b)).toBe('Requesting more Off chips…');
+      press(b, 'Enter'); // still pending: no second request
+      await flush();
+      expect(ask).toHaveBeenCalledTimes(1);
+      expect(ask).toHaveBeenCalledWith({ chip: expect.objectContaining({ id: 'off' }) });
+      expect(liveText(b)).toBe('Request granted: more Off chips.');
+      expect(b.supply.get().counts.off).toBe(0); // the cap is the starting count: 0
+    });
+
+    it('grants up to the starting count when the host has no callback', async () => {
+      const b = stocked({ on: 3, off: 1 }, onRequest);
+      b.supply.set({ chip: 'on', count: 0 });
+      await expect(b.supply.request({ chip: 'on' })).resolves.toBe('grant');
+      expect(b.supply.get().counts.on).toBe(3);
+    });
+
+    it('treats a denial, a junk answer, or a failure as denied', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const answers = [
+        () => 'deny' as const,
+        () => 'yes please' as never,
+        () => Promise.reject(new Error('backend down')),
+      ];
+      for (const answer of answers) {
+        const b = stocked({ on: 0, off: 1 }, { ...onRequest, onRequest: answer });
+        await expect(b.supply.request({ chip: 'on' })).resolves.toBe('deny');
+        expect(liveText(b)).toBe('Request for more On chips was denied.');
+        expect(b.supply.get().counts.on).toBe(0);
+      }
+      expect(error).toHaveBeenCalledTimes(1);
+      error.mockRestore();
+    });
+
+    it("denies without asking when a kind isn't requestable", async () => {
+      const ask = vi.fn(() => 'grant' as const);
+      const b = stocked({ on: 2, off: 0 }, { onRequest: ask }); // policy: never
+      await expect(b.supply.request({ chip: 'off' })).resolves.toBe('deny');
+      await expect(b.supply.request({ chip: 'nope' })).resolves.toBe('deny');
+      expect(ask).not.toHaveBeenCalled();
+    });
   });
 });
 
