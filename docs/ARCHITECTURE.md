@@ -503,7 +503,7 @@ sequenceDiagram
     C->>Sup: reserve('on')
     Sup-->>C: ok (7 + 1 in hand)
     C->>B: state = Holding
-    B->>A: "Picked up an On chip. Up arrow carries it to the top."
+    B->>A: "Picked up an On chip. Use the arrow keys to move it."
     B->>L: wake
     U->>K: Shift+↑ ×3
     K->>C: lift(+0.3) ×3

@@ -92,7 +92,7 @@ export const DEFAULT_LABELS: Labels = {
     'Enter drops, Escape puts the chip back.',
   selected: (input) => `${input.chip.label} chip${stock(input)}.`,
   pickedUp: ({ chip }) =>
-    `Picked up ${article(chip.label)} ${chip.label} chip. Up arrow carries it to the top.`,
+    `Picked up ${article(chip.label)} ${chip.label} chip. Use the arrow keys to move it.`,
   cancelled: ({ chip }) => `Put the ${chip.label} chip back.`,
   dropped: () => 'Dropped.',
   enteredDropZone: 'Over the drop zone. Release or press Enter to drop.',
