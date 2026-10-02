@@ -17,7 +17,22 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "complexity": {
+        "noExcessiveLinesPerFunction": {
+          "level": "warn",
+          "options": { "maxLines": 30, "skipBlankLines": true }
+        },
+        "noExcessiveCognitiveComplexity": {
+          "level": "warn",
+          "options": { "maxAllowedComplexity": 8 }
+        },
+        "useMaxParams": { "level": "warn", "options": { "max": 2 } }
+      },
+      "style": {
+        "noNestedTernary": "warn",
+        "noUselessElse": "warn"
+      }
     }
   },
   "javascript": {
@@ -34,6 +49,27 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["src/core/vendor/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveLinesPerFunction": "off",
+            "noExcessiveCognitiveComplexity": "off",
+            "useMaxParams": "off"
+          },
+          "style": { "noNestedTernary": "off", "noUselessElse": "off" }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.test.ts", "e2e/**"],
+      "linter": {
+        "rules": {
+          "complexity": { "noExcessiveLinesPerFunction": "off" }
+        }
+      }
+    },
     {
       "includes": ["src/core/**"],
       "linter": {
