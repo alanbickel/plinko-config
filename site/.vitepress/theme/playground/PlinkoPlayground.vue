@@ -25,13 +25,29 @@ const log = ref<LogEntry[]>([]);
 const transcript = ref<Announcement[]>([]);
 const paused = ref(false);
 const autoDrop = ref(false);
-const pane = ref<'log' | 'transcript' | 'export'>('log');
+const pane = ref<'log' | 'results' | 'transcript' | 'export'>('log');
 const copied = ref(false);
+/** Chips per slot id, then per chip id, since the board was last built. */
+const tally = ref<Record<string, Record<string, number>>>({});
+const missed = ref(0);
 let board: PlaygroundBoard | undefined;
 
 const MAX_LOG = 200;
 const snapshot = (): PlaygroundConfig => JSON.parse(JSON.stringify(config));
 const code = computed(() => exportConfig(snapshot()));
+
+const sum = (counts: Record<string, number>) => Object.values(counts).reduce((a, b) => a + b, 0);
+const histogram = computed(() => {
+  const columns = config.slots.map((slot) => {
+    const byChip = tally.value[slot.id] ?? {};
+    const segments = config.chips
+      .map((chip) => ({ chip, count: byChip[chip.id] ?? 0 }))
+      .filter((segment) => segment.count > 0);
+    return { slot, total: sum(byChip), segments };
+  });
+  const landed = columns.reduce((n, column) => n + column.total, 0);
+  return { columns, landed, max: Math.max(1, ...columns.map((column) => column.total)) };
+});
 
 onMounted(() => {
   if (!host.value) return;
@@ -42,6 +58,19 @@ onMounted(() => {
     },
     onAnnounce: (entry) => {
       transcript.value = [entry, ...transcript.value].slice(0, MAX_LOG);
+    },
+    onResult: ({ chipId, slotId }) => {
+      if (slotId === null) {
+        missed.value++;
+        return;
+      }
+      const byChip = tally.value[slotId] ?? {};
+      byChip[chipId] = (byChip[chipId] ?? 0) + 1;
+      tally.value[slotId] = byChip;
+    },
+    onReset: () => {
+      tally.value = {};
+      missed.value = 0;
     },
     onError: (message) => {
       error.value = message;
@@ -250,6 +279,7 @@ const tint = (hex: string) => `${hex}40`;
     <div class="panes">
       <div class="tabs" role="tablist">
         <button type="button" role="tab" :aria-selected="pane === 'log'" @click="pane = 'log'">Callbacks</button>
+        <button type="button" role="tab" :aria-selected="pane === 'results'" @click="pane = 'results'">Results</button>
         <button type="button" role="tab" :aria-selected="pane === 'transcript'" @click="pane = 'transcript'">Screen reader</button>
         <button type="button" role="tab" :aria-selected="pane === 'export'" @click="pane = 'export'">Export config</button>
       </div>
@@ -259,6 +289,26 @@ const tint = (hex: string) => `${hex}40`;
           <time>{{ seconds(entry.at) }}s</time> <code>{{ entry.callback }}</code> {{ entry.text }}
         </li>
       </ol>
+      <div v-else-if="pane === 'results'" class="results" role="tabpanel">
+        <p v-if="histogram.landed + missed === 0" class="empty">Drop chips (or turn on Auto-drop) to see where they land.</p>
+        <p v-else>{{ histogram.landed }} landed, {{ missed }} missed</p>
+        <ol class="histogram">
+          <li v-for="column in histogram.columns" :key="column.slot.id">
+            <span class="total">{{ column.total }}</span>
+            <span class="track">
+              <span class="bar" :style="{ height: `${(column.total / histogram.max) * 100}%` }">
+                <span
+                  v-for="segment in column.segments"
+                  :key="segment.chip.id"
+                  :style="{ background: segment.chip.fill, flexGrow: segment.count }"
+                  :title="`${segment.chip.label}: ${segment.count}`"
+                />
+              </span>
+            </span>
+            <span class="label" :title="column.slot.label">{{ column.slot.label }}</span>
+          </li>
+        </ol>
+      </div>
       <ol v-else-if="pane === 'transcript'" class="log" role="tabpanel">
         <li v-if="transcript.length === 0" class="empty">Pick up or drop a chip to see what a screen reader announces.</li>
         <li v-for="(entry, i) in transcript" :key="transcript.length - i">
@@ -423,6 +473,54 @@ input[type='color'] {
 }
 .log .empty {
   color: var(--vp-c-text-3);
+}
+.results {
+  background: var(--vp-c-bg-soft);
+  border-radius: 8px;
+  font-size: 13px;
+  padding: 12px;
+}
+.results p {
+  margin: 0 0 8px;
+}
+.results .empty {
+  color: var(--vp-c-text-3);
+}
+.histogram {
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.histogram li {
+  display: grid;
+  flex: 1;
+  grid-template-rows: auto 160px auto;
+  min-width: 0;
+  text-align: center;
+}
+.histogram .total {
+  font-variant-numeric: tabular-nums;
+}
+.histogram .track {
+  align-items: flex-end;
+  border-bottom: 1px solid var(--vp-c-divider);
+  display: flex;
+}
+.histogram .bar {
+  display: flex;
+  flex-direction: column-reverse;
+  width: 100%;
+}
+.histogram .bar span {
+  flex-basis: 0;
+}
+.histogram .label {
+  color: var(--vp-c-text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .export {
   position: relative;
