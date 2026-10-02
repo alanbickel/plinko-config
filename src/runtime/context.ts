@@ -5,17 +5,17 @@ import type { ChipKindConfig, SlotConfig } from '../core/types';
 import type { World, WorldEvent } from '../core/world';
 import type { CommandMachine, HoldingState } from './commands';
 import type { RuntimeConfig } from './config';
-import type { Zone } from './input/keyboard';
+import type { Zone } from './input/actions';
 import type { StockLabelInput } from './labels';
 import type { FrameLoop } from './loop';
 import type { FullReason, PlinkoOptions, RequestAnswer, Settled } from './types';
 import type { Announcer } from './view/a11y';
 import type { CanvasView } from './view/canvas';
 import type { BoardDom } from './view/dom';
+import type { BoardPoint, CarryPath, FallingChip } from './view/geometry';
 
 /** Mutable UI state that isn't the held-chip state machine. */
 export interface UiState {
-  zone: Zone;
   /** Index of the selected kind in the tray. */
   selected: number;
   focused: boolean;
@@ -32,11 +32,17 @@ export interface UiState {
   lockReason: FullReason | undefined;
   /** Last snapshot reported to onSupplyChange, to skip reports when nothing changed. */
   lastSupplyReport: string | undefined;
+  /** Where a pointer drag holds the chip, board units; undefined when no drag is in progress. */
+  dragPoint: BoardPoint | undefined;
+  /** Lost chips still on their way off the board. */
+  falling: FallingChip[];
 }
 
 export interface BoardContext {
   host: HTMLElement;
   win: Window | null;
+  /** The visitor asked for less motion: no animated scrolling or flashes. */
+  reducedMotion: boolean;
   /** The host's options, including its (untrusted) callbacks. */
   options: PlinkoOptions;
   config: RuntimeConfig;
@@ -44,6 +50,8 @@ export interface BoardContext {
   chips: readonly ChipKindConfig<unknown>[];
   kindIds: readonly string[];
   world: World;
+  /** The held chip's path from the tray to the drop line. */
+  carry: CarryPath;
   supply: Supply;
   /** Requests for more chips waiting on the host, by kind. */
   requests: Map<string, Promise<RequestAnswer>>;
@@ -61,7 +69,6 @@ export interface BoardContext {
 
 export function initialUiState(): UiState {
   return {
-    zone: 'tray',
     selected: 0,
     focused: false,
     pausedByHost: false,
@@ -72,6 +79,8 @@ export function initialUiState(): UiState {
     lastPegHit: -Infinity,
     lockReason: undefined,
     lastSupplyReport: undefined,
+    dragPoint: undefined,
+    falling: [],
   };
 }
 
@@ -97,9 +106,14 @@ export function heldChip(ctx: BoardContext): HoldingState | undefined {
 /** After any change: mirror state on the wrapper and draw. */
 export function refresh(ctx: BoardContext): void {
   ctx.dom.wrapper.dataset.state = ctx.machine.state.name;
-  ctx.dom.wrapper.dataset.zone = ctx.ui.zone;
+  ctx.dom.wrapper.dataset.zone = zoneOf(ctx);
   ctx.loop.wake();
   ctx.loop.redraw();
+}
+
+/** Keyboard zone: the board while a chip is held, otherwise the tray. */
+export function zoneOf(ctx: BoardContext): Zone {
+  return heldChip(ctx) ? 'board' : 'tray';
 }
 
 /** A kind and its stock, for announcements. */

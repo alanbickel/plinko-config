@@ -1,5 +1,5 @@
-// Board sizing (ARCHITECTURE.md §7): fill the host's width; if the host has a height of its own,
-// fit inside it too, centred.
+// Board sizing (ARCHITECTURE.md §7): fill the host's width, but never be taller than the screen,
+// nor than the host if it has a height of its own. Centred when narrower than the host.
 
 import type { BoardContext } from './context';
 
@@ -8,7 +8,7 @@ const FALLBACK_WIDTH = 300;
 interface FitInput {
   /** Width available, CSS pixels. */
   available: number;
-  /** Height the host leaves for the canvas; ≤ 1 when the host has no height of its own. */
+  /** Height the canvas may use; Infinity when nothing limits it. */
   roomHeight: number;
   /** Board width ÷ height. */
   aspect: number;
@@ -20,7 +20,7 @@ export function fitToHost(ctx: BoardContext): void {
   canvas.style.height = '0px';
   const width = fitWidth({
     available: wrapper.clientWidth || FALLBACK_WIDTH,
-    roomHeight: roomHeight(ctx),
+    roomHeight: Math.min(hostRoom(ctx), screenRoom(ctx)),
     aspect: ctx.view.aspect,
   });
   const height = ctx.view.resize(width, ctx.win?.devicePixelRatio || 1);
@@ -30,12 +30,24 @@ export function fitToHost(ctx: BoardContext): void {
 }
 
 /** Host height left for the canvas, after padding and the wrapper's other content. */
-function roomHeight({ host, win, dom }: BoardContext): number {
+function hostRoom({ host, win, dom }: BoardContext): number {
   const style = win?.getComputedStyle(host);
   const padding = style ? parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) : 0;
-  return host.clientHeight - padding - dom.wrapper.offsetHeight;
+  return usable(host.clientHeight - padding - dom.wrapper.offsetHeight);
 }
 
+/**
+ * Screen height left for the canvas. Touch drags can't scroll the page (touch-action: none), so
+ * the whole board, tray included, must fit on screen. documentElement.clientHeight is the height
+ * with mobile browser bars shown, so the board doesn't resize as they hide and show.
+ */
+function screenRoom({ win, dom }: BoardContext): number {
+  return usable((win?.document.documentElement.clientHeight ?? 0) - dom.wrapper.offsetHeight);
+}
+
+/** A height of 1px or less means nothing measurable: no limit. */
+const usable = (height: number) => (height > 1 ? height : Infinity);
+
 function fitWidth({ available, roomHeight, aspect }: FitInput): number {
-  return roomHeight > 1 ? Math.min(available, roomHeight * aspect) : available;
+  return Math.min(available, roomHeight * aspect);
 }

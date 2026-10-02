@@ -59,7 +59,7 @@ function createCanvas({ doc, id, labels }: Maker): HTMLCanvasElement {
   canvas.setAttribute('aria-roledescription', 'game');
   canvas.setAttribute('aria-label', labels.board);
   canvas.setAttribute('aria-describedby', `${id}-instructions`);
-  canvas.style.cssText = 'display:block;margin:0 auto;touch-action:none';
+  canvas.style.cssText = 'display:block;margin:0 auto;touch-action:none;user-select:none';
   return canvas;
 }
 

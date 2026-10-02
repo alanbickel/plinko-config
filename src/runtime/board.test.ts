@@ -36,6 +36,10 @@ const press = (b: PlinkoBoard, key: string | KeyboardEventInit): KeyboardEvent =
   canvasOf(b).dispatchEvent(event);
   return event;
 };
+/** Carries the held chip all the way up into the drop zone, by keyboard. */
+const carryUp = (b: PlinkoBoard) => {
+  for (let i = 0; i < 6; i++) press(b, { key: 'ArrowUp', shiftKey: true });
+};
 /** Runs the frame loop for this much simulated time. */
 const run = (ms: number) => vi.advanceTimersByTime(ms);
 
@@ -140,6 +144,7 @@ describe('keyboard', () => {
     expect(b.element.dataset).toMatchObject({ state: 'holding', zone: 'board' });
     expect(liveText(b)).toMatch(/Picked up an Off chip/);
 
+    carryUp(b);
     press(b, 'End');
     press(b, { key: 'ArrowLeft', shiftKey: true });
     press(b, 'Enter');
@@ -169,13 +174,58 @@ describe('keyboard', () => {
 
   it('honours custom bindings and step sizes', () => {
     const onDrop = vi.fn();
-    const b = mount({ keys: { drop: ['d'] }, aimStep: 0.01, onDrop });
+    const b = mount({ keys: { drop: ['d'] }, aimStep: 0.01, liftStep: 1, onDrop });
     press(b, 'Enter');
+    press(b, 'ArrowUp'); // one step of the whole carry: straight into the drop zone
     press(b, 'ArrowRight');
     press(b, 'Enter'); // not a drop key any more
     expect(onDrop).not.toHaveBeenCalled();
     press(b, 'd');
     expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ dropId: 0, dropX: 0.51 }));
+  });
+});
+
+describe('keyboard carrying', () => {
+  it('announces the drop zone on the way up and the way down', () => {
+    const b = mount();
+    press(b, 'Enter');
+    carryUp(b);
+    expect(liveText(b)).toContain('Over the drop zone');
+    press(b, { key: 'ArrowDown', shiftKey: true });
+    expect(liveText(b)).toContain('Left the drop zone');
+  });
+
+  it('Enter below the drop zone loses the chip, with no callbacks and no warning', () => {
+    const onDrop = vi.fn();
+    const onSupplyChange = vi.fn();
+    const b = mount({ chips: [{ id: 'on', label: 'On', count: 3 }], onDrop, onSupplyChange });
+    press(b, 'Enter');
+    press(b, 'ArrowUp');
+    press(b, 'Enter');
+    expect(onDrop).not.toHaveBeenCalled();
+    expect(onSupplyChange).toHaveBeenLastCalledWith({ counts: { on: 2 } });
+    expect(b.element.dataset).toMatchObject({ state: 'idle', zone: 'tray' });
+    expect(liveText(b)).toBe('The On chip fell off the board.');
+    run(1000); // the falling chip finishes and the loop sleeps
+  });
+
+  it('auto-reload keeps the next chip in the drop zone, so Enter fires again', () => {
+    const onDrop = vi.fn();
+    const b = mount({ onDrop });
+    press(b, 'Enter');
+    carryUp(b);
+    press(b, 'Enter');
+    press(b, 'Enter');
+    expect(onDrop).toHaveBeenCalledTimes(2);
+  });
+
+  it('drop() from the handle carries the chip up itself, quietly', async () => {
+    const onDrop = vi.fn();
+    const b = mount({ onDrop, autoReload: false });
+    b.pickUp('on');
+    void b.drop();
+    expect(onDrop).toHaveBeenCalledOnce();
+    expect(liveText(b)).not.toContain('drop zone');
   });
 });
 
@@ -322,7 +372,8 @@ describe('supply', () => {
     const onExhausted = vi.fn();
     const b = stocked({ on: 2, off: Infinity }, { onExhausted });
     press(b, 'Enter');
-    press(b, 'Enter'); // drop; auto-reload picks up the last one
+    carryUp(b);
+    press(b, 'Enter'); // drop; auto-reload picks up the last one, still in the drop zone
     expect(onExhausted).not.toHaveBeenCalled();
     press(b, 'Enter'); // drop the last one
     expect(onExhausted).toHaveBeenCalledWith({ chip: expect.objectContaining({ id: 'on' }) });
@@ -334,6 +385,7 @@ describe('supply', () => {
     const onFull = vi.fn();
     const b = stocked({ on: 1, off: 0 }, { onFull });
     press(b, 'Enter');
+    carryUp(b);
     press(b, 'Enter');
     expect(onFull).toHaveBeenCalledWith({ reason: 'exhausted' });
     expect(b.element.dataset.state).toBe('locked');

@@ -1,10 +1,15 @@
-import { expect, type Page, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 // Runs against demo/runtime.html, which mounts the board through the public API only.
 
 const board = (page: Page) => page.locator('#host .plinko-config');
 const canvas = (page: Page) => page.locator('#host canvas');
 const lastAnnouncement = (page: Page) => page.locator('#transcript li').last();
+/** Carries the held chip up into the drop zone, by keyboard. */
+async function carryUp(page: Page): Promise<void> {
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowUp');
+}
 const focusIsCanvas = (page: Page) =>
   page.evaluate(() => document.activeElement?.tagName === 'CANVAS');
 
@@ -45,48 +50,68 @@ test('fits inside a host that has its own height, and refits on resize', async (
   }).toPass();
 });
 
-test('plays entirely by keyboard, with announcements', async ({ page }) => {
-  await page.locator('#skip').focus();
-  await page.keyboard.press('Tab');
-  expect(await focusIsCanvas(page)).toBe(true);
+test.describe('keyboard', () => {
+  test.skip(({ isMobile }) => isMobile, 'keyboard play is checked on desktop');
+  test('plays entirely by keyboard, with announcements', async ({ page }) => {
+    await page.locator('#skip').focus();
+    await page.keyboard.press('Tab');
+    expect(await focusIsCanvas(page)).toBe(true);
 
-  await page.keyboard.press('ArrowRight');
-  await expect(lastAnnouncement(page)).toHaveText('Off chip, 5 left.');
+    await page.keyboard.press('ArrowRight');
+    await expect(lastAnnouncement(page)).toHaveText('Off chip, 5 left.');
 
-  await page.keyboard.press('Enter');
-  await expect(board(page)).toHaveAttribute('data-state', 'holding');
-  await expect(board(page)).toHaveAttribute('data-zone', 'board');
-  await expect(lastAnnouncement(page)).toContainText('Picked up an Off chip');
+    await page.keyboard.press('Enter');
+    await expect(board(page)).toHaveAttribute('data-state', 'holding');
+    await expect(board(page)).toHaveAttribute('data-zone', 'board');
+    await expect(lastAnnouncement(page)).toContainText('Picked up an Off chip');
 
-  await page.keyboard.press('End');
-  await page.keyboard.press('Enter');
-  await expect(page.locator('#log')).toContainText('onDrop');
-  await expect(page.locator('#log')).toContainText(/onLand|onMiss/, { timeout: 10_000 });
-  await expect(lastAnnouncement(page)).toContainText(/landed in|didn't make it/);
+    await carryUp(page);
+    await expect(lastAnnouncement(page)).toHaveText(
+      'Over the drop zone. Release or press Enter to drop.',
+    );
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#log')).toContainText('onDrop');
+    await expect(page.locator('#log')).toContainText(/onLand|onMiss/, { timeout: 10_000 });
+    await expect(lastAnnouncement(page)).toContainText(/landed in|didn't make it/);
 
-  await page.keyboard.press('Escape');
-  await expect(board(page)).toHaveAttribute('data-state', 'idle');
-  await expect(board(page)).toHaveAttribute('data-zone', 'tray');
-});
+    await page.keyboard.press('Escape');
+    await expect(board(page)).toHaveAttribute('data-state', 'idle');
+    await expect(board(page)).toHaveAttribute('data-zone', 'tray');
+  });
 
-test('Tab always leaves the board, even while holding a chip', async ({ page }) => {
-  await canvas(page).focus();
-  await page.keyboard.press('Enter');
-  await expect(board(page)).toHaveAttribute('data-state', 'holding');
-  await page.keyboard.press('Tab');
-  expect(await focusIsCanvas(page)).toBe(false);
-});
+  test('Enter below the drop zone loses the chip off the board', async ({ page }) => {
+    await canvas(page).focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('Enter');
+    await expect(lastAnnouncement(page)).toHaveText('The On chip fell off the board.');
+    await expect(page.locator('#state')).toContainText('"on":4');
+    await expect(page.locator('#log')).not.toContainText('onDrop');
+  });
 
-test('runs out of chips and requests more, by keyboard', async ({ page }) => {
-  await page.locator('#countOn').fill('1');
-  await page.locator('#countOn').blur(); // the browser's change event remounts: 1 On chip, refill onRequest
-  await canvas(page).focus();
-  await page.keyboard.press('Enter'); // pick up the only On chip
-  await page.keyboard.press('Enter'); // drop it
-  await expect(lastAnnouncement(page)).toHaveText('Out of On chips. Press Enter to request more.');
-  await page.keyboard.press('Enter'); // request (no callback on the page: granted)
-  await expect(lastAnnouncement(page)).toHaveText('Request granted: more On chips.');
-  await expect(page.locator('#state')).toContainText('"on":1');
+  test('Tab always leaves the board, even while holding a chip', async ({ page }) => {
+    await canvas(page).focus();
+    await page.keyboard.press('Enter');
+    await expect(board(page)).toHaveAttribute('data-state', 'holding');
+    await page.keyboard.press('Tab');
+    expect(await focusIsCanvas(page)).toBe(false);
+  });
+
+  test('runs out of chips and requests more, by keyboard', async ({ page }) => {
+    await page.locator('#countOn').fill('1');
+    await page.locator('#countOn').blur(); // the browser's change event remounts: 1 On chip, refill onRequest
+    await canvas(page).focus();
+    await page.keyboard.press('Enter'); // pick up the only On chip
+    await carryUp(page);
+    await page.keyboard.press('Enter'); // drop it
+    await expect(lastAnnouncement(page)).toHaveText(
+      'Out of On chips. Press Enter to request more.',
+    );
+    await page.keyboard.press('Enter'); // request (no callback on the page: granted)
+    await expect(lastAnnouncement(page)).toHaveText('Request granted: more On chips.');
+    await expect(page.locator('#state')).toContainText('"on":1');
+  });
 });
 
 test('destroy() leaves nothing behind', async ({ page }) => {

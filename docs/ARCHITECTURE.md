@@ -129,8 +129,8 @@ flowchart TB
             direction TB
             subgraph inputs[" "]
                 direction LR
-                kb["<b>Keyboard input</b><br/><i>input/keyboard.ts</i><br/>key → command"]:::comp
-                ptr["<b>Pointer input</b><br/><i>input/pointer.ts</i><br/>drag/click → command"]:::comp
+                kb["<b>Keyboard input</b><br/><i>input/keyboard.ts</i><br/>key → action"]:::comp
+                ptr["<b>Pointer input</b><br/><i>input/pointer.ts · pointer-dom.ts</i><br/>drag → action"]:::comp
             end
             cmds["<b>Command state machine</b><br/><i>commands.ts</i><br/>pickUp · aim · nudge · drop · cancel"]:::comp
             board["<b>Board controller</b><br/><i>board.ts · assemble.ts · handle.ts</i><br/>createPlinko(); public handle;<br/>wiring; host callbacks"]:::comp
@@ -198,7 +198,7 @@ flowchart TB
 |---|---|---|
 | Board controller | Lifecycle, wiring, public handle, invoking host callbacks (wrapped in try/catch) | Physics math, drawing |
 | Command state machine | The *only* path that changes held/in-flight state; enforces `maxInFlight` and supply | Read the DOM or keys directly |
-| Keyboard / Pointer input | Translating raw events into commands | Change state directly |
+| Keyboard / Pointer input | Translating raw events into actions, applied through one path (`input/perform.ts`). The canvas view says what a point is over (`hitTest`). | Change state directly |
 | Frame loop | Time: RAF, accumulator, sleep/wake, visibility | Know what chips are |
 | Canvas / DOM views | Pixels and nodes, derived from state | Mutate state |
 | Announcer | Wording (via `labels`) and throttling | Decide *when* something happened |
@@ -346,11 +346,15 @@ flowchart TB
         Idle -- "pickUp(kind)" --> canPick{"reserve?"}:::choice
         canPick -- "ok" --> Holding(["Holding"]):::state
         canPick -- "none left" --> Idle
-        Holding -- "aim / nudge" --> Holding
+        Holding -- "aim / nudge / lift" --> Holding
         Holding -- "cancel" --> Idle
-        Holding -- "drop" --> Dropping(["Dropping"]):::state
+        Holding -- "drop" --> inZone{"in drop zone?"}:::choice
+        inZone -- "yes" --> Dropping(["Dropping"]):::state
+        inZone -- "no" --> Lost(["Lost"]):::state
+        Holding -- "lose" --> Lost
+        Lost -- "commit, chip falls<br/>off the board" --> Idle
         Dropping -- "commit + spawn" --> reload{"reload?"}:::choice
-        reload -- "autoReload and reserve ok" --> Holding
+        reload -- "reload asked, autoReload,<br/>and reserve ok" --> Holding
         reload -- "otherwise" --> Idle
         Idle -- "board full or<br/>supply exhausted" --> Locked(["Locked"]):::state
         Holding -- "board full<br/>(chip back to tray)" --> Locked
@@ -364,16 +368,21 @@ flowchart TB
 
 | Transition | Guard / side effects |
 |---|---|
-| `Idle → Holding` | `supply.reserve(kind)` succeeds. Announce pickup. Keyboard zone moves to the board. |
+| `Idle → Holding` | `supply.reserve(kind)` succeeds. The chip starts in the tray (lift 0). Announce pickup. |
 | `Idle → Idle` (none left) | Announce "Out of *kind* chips." With refill mode `onRequest`, the tray shows "request more", and Enter on the empty kind asks the host (`onRequest` → `'grant'` / `'deny'`, possibly async; no callback means granted). |
-| `Holding → Holding` | `aim(x)` / `nudge(dx)`, clamped to the board's drop range. |
-| `Holding → Idle` (cancel) | `Esc`, or pointer released off the board. `supply.release`. Keyboard zone returns to the tray. |
-| `Holding → Dropping` | Only if `inFlight < maxInFlight`; otherwise stay in `Holding` and announce "wait." |
-| `Dropping → …` | Commit the reservation, spawn the chip in the world, fire `onDrop`. With `autoReload`, reserve the next chip of the same kind at the same x. |
+| `Holding → Holding` | `aim(x)` / `nudge(dx)` across, `lift(dy)` / `liftTo(lift)` up and down, each clamped to [0, 1]. Crossing into or out of the drop zone is announced. |
+| `Holding → Idle` (cancel) | `Esc`, or a drag released over the tray (a tap included). A gesture the browser cancels. `supply.release`. |
+| `Holding → Dropping` | `drop()` with the chip in the drop zone, and only if `inFlight < maxInFlight`; otherwise stay in `Holding` and announce "wait." |
+| `Dropping → …` | Commit the reservation, spawn the chip in the world at x, fire `onDrop`. If the drop asked for a reload (keyboard and handle do; a pointer release doesn't, since the finger has lifted) and `autoReload` is on, reserve the next chip of the same kind at the same x and lift. |
+| `Holding → Lost → Idle` | `drop()` outside the drop zone, or `lose()` (a drag released anywhere but the tray or the drop zone). Commit the reservation: the chip is spent, and falls off the bottom of the canvas (drawn, not simulated; it fades instead under reduced motion). **No `onDrop`, `onLand`, or `onMiss`.** `onSupplyChange` still reports the count, exhaustion rules apply, and the announcer says the chip fell off the board. Never reloads. |
 | `Idle` / `Holding` → `Locked` | The world reports `full` (`slots` / `overflow`), or the supply is exhausted (every kind at 0, none in hand, refill mode `never`). `onFull` fires once, with the first reason. A held chip goes back to the tray (`supply.release`). Pending landings are announced, then the lock message. Every later command is refused; `drop()` rejects. In-flight chips finish normally. |
-| any → destroyed | `destroy()`: release any reservation, flush saves, tear down. Pending `drop()` promises resolve, since their chips are gone. |
+| any → destroyed | `destroy()`: release any reservation, tear down. Pending `drop()` promises resolve, since their chips are gone. |
 
-The canvas is a single tab stop. Inside it, a *keyboard zone* (tray or board) is tracked separately from this machine. It only decides how keys are interpreted: tray keys select a kind and produce `pickUp`, and board keys produce `aim`/`nudge`/`drop`/`cancel`. Tab and modified keys are never handled, so focus can always leave. Nudge sizes are `aimStep` / `aimStepLarge` (fractions of the drop width; defaults ¼ slot and 1 slot). The wrapper exposes the current state and zone as `data-state` / `data-zone`.
+**Carrying.** The held chip has two coordinates, both fractions: `x` across the drop range (0 = left, 1 = right) and `lift` from the tray (0) to the drop line (1). It starts in the tray and has to be carried up into the **drop zone**, the band above the first peg row, before it can drop. The view maps both to board units (the *carry path*, from the tray chip's centre up to the spawn line); the machine only knows the lift where the zone starts. While a chip is held, the drop zone is outlined, and it glows while the chip is inside.
+
+The canvas is a single tab stop. The *keyboard zone* is the tray while nothing is held and the board while a chip is; it only decides how keys are interpreted. Tray: `←`/`→` select a kind, Enter/Space pick it up. Board: `←`/`→` move across (`aimStep` / `aimStepLarge`, fractions of the drop width; defaults ¼ slot and 1 slot), `↑`/`↓` carry up and down (`liftStep` / `liftStepLarge`, fractions of the carry path; defaults one peg row and four), Home/End jump to the edges, Enter/Space drop, Esc puts the chip back. `↓` never drops. Enter outside the drop zone loses the chip, with no warning. Tab and modified keys are never handled, so focus can always leave. The wrapper exposes the state and keyboard zone as `data-state` / `data-zone`.
+
+Pointer input produces the same actions, and touch and mouse behave alike: **drag only**. A press on a tray chip picks it up (or, on an empty kind that can be requested, asks for more), and the chip is drawn under the pointer from then on. Moving carries it (`aim` + `liftTo`). The release decides: in the drop zone, drop (no reload); over the tray, put it back, so a tap does nothing; anywhere else, including off the canvas, lose it. A press anywhere else does nothing. One press is tracked at a time, with pointer capture so a drag released off the canvas still ends. A press focuses the canvas without the focus ring, which appears once a key is used. The canvas has `touch-action: none`, so a touch drag can't scroll the page; that's why the board never outgrows the screen (§7), and a pointer pickup scrolls the board fully into view if part of it is cut off.
 
 **Invariants**
 
@@ -399,13 +408,15 @@ flowchart LR
         start((" ")):::start --> InTray(["In tray"]):::state
         InTray -- "pickUp" --> Reserved(["Reserved"]):::state
         Reserved -- "cancel (release)" --> InTray
-        Reserved -- "drop (commit, spawn)" --> InFlight(["In flight"]):::state
+        Reserved -- "drop in the drop zone<br/>(commit, spawn)" --> InFlight(["In flight"]):::state
+        Reserved -- "dropped outside the zone<br/>(commit, no callbacks)" --> Lost(["Fell off the board"]):::state
         InFlight -- "step: gravity, collisions,<br/>pegHit, safety-net nudge" --> InFlight
         InFlight -- "at rest, partly<br/>below rail tops" --> Landed(["Landed"]):::state
         InFlight -- "at rest on pile above rails,<br/>or 60 s failsafe" --> Missed(["Missed"]):::state
         Landed -- "onLand fired,<br/>frozen as static collider" --> Resting(["Resting in pile"]):::state
         Missed -- "onMiss fired (no onLand),<br/>frozen as static collider" --> Resting
         Resting -- "destroy()" --> done(((" "))):::start
+        Lost --> done
     end
 
     classDef start fill:#e6edf3,stroke:#e6edf3,color:#0d1117
@@ -455,7 +466,7 @@ sequenceDiagram
 
 `createPlinko` is synchronous and the board is usable immediately: there is nothing to load. To restore chip counts after a reload, the host passes saved counts as `chips[].count`.
 
-**Sizing.** The board fills the host's width. If the host has a height of its own, the board also fits inside it, centred. To tell the two apart, the board collapses its canvas for a moment and measures what height the host keeps. Both the wrapper and the host are observed, so the board refits whenever either changes.
+**Sizing.** The board fills the host's width, but is never taller than the screen (the height with mobile browser bars shown, `documentElement.clientHeight`, so it doesn't resize as they hide and show). Touch drags can't scroll the page, so the whole board, tray included, must fit on screen. If the host has a height of its own, the board also fits inside it, centred. To tell the two apart, the board collapses its canvas for a moment and measures what height the host keeps. The wrapper, the host, and the window are observed, and refits run on the next frame: refitting inside a ResizeObserver callback, when the host's height follows the canvas, makes the browser report an error on the page.
 
 ---
 
@@ -484,14 +495,17 @@ sequenceDiagram
     C->>Sup: reserve('on')
     Sup-->>C: ok (7 + 1 in hand)
     C->>B: state = Holding
-    B->>A: "Picked up an On chip. Arrows to aim, Enter to drop."
+    B->>A: "Picked up an On chip. Up arrow carries it to the top."
     B->>L: wake
+    U->>K: Shift+↑ ×3
+    K->>C: lift(+0.3) ×3
+    C->>B: entered the drop zone
+    B->>A: "Over the drop zone. Release or press Enter to drop."
     U->>K: → → (Shift+→)
     K->>C: nudge(+0.02) ×2, nudge(+0.1)
     U->>K: Enter
-    K->>C: drop()
+    K->>C: drop(reload)
     C->>Sup: commit('on')
-    Sup->>Sup: schedule debounced save
     C->>W: spawn(chip, x=0.64, rng(seed, dropId))
     C->>Sup: reserve('on') (autoReload)
     C->>B: onDrop, still Holding

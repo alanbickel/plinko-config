@@ -1,16 +1,20 @@
-// Size and visibility observers. Both are optional: environments without them just don't refit
-// or pause.
+// Size, screen, and visibility observers. The observers are optional: environments without them
+// just don't refit or pause.
 
 import type { BoardContext } from './context';
 import { fitToHost } from './sizing';
 
 /** Observes size and visibility; returns a function that stops observing. */
 export function observeHost(ctx: BoardContext): () => void {
-  const resize = observeSize(ctx);
+  const refit = deferredFit(ctx);
+  const resize = observeSize(ctx, refit);
   const visibility = observeVisibility(ctx);
+  const stopScreen = observeScreen(ctx, refit);
   return () => {
     resize?.disconnect();
     visibility?.disconnect();
+    stopScreen();
+    refit.cancel();
   };
 }
 
@@ -23,12 +27,47 @@ export function applyPause({ ui, loop }: BoardContext): void {
   loop.resume();
 }
 
-function observeSize(ctx: BoardContext): ResizeObserver | undefined {
+/** A refit on the next frame; repeated requests before then share it. */
+interface DeferredFit {
+  schedule(): void;
+  cancel(): void;
+}
+
+/**
+ * Refitting inside a ResizeObserver callback resizes what it observes when the host's height
+ * follows the canvas, and the browser reports that as an error on the page. A frame later, it
+ * doesn't.
+ */
+function deferredFit(ctx: BoardContext): DeferredFit {
+  let frame: number | undefined;
+  const run = () => {
+    frame = undefined;
+    fitToHost(ctx);
+  };
+  return {
+    schedule: () => {
+      frame ??= ctx.win?.requestAnimationFrame(run);
+    },
+    cancel: () => {
+      if (frame !== undefined) ctx.win?.cancelAnimationFrame(frame);
+    },
+  };
+}
+
+function observeSize(ctx: BoardContext, refit: DeferredFit): ResizeObserver | undefined {
   if (typeof ResizeObserver === 'undefined') return undefined;
-  const observer = new ResizeObserver(() => fitToHost(ctx));
+  const observer = new ResizeObserver(() => refit.schedule());
   observer.observe(ctx.dom.wrapper);
   observer.observe(ctx.host);
   return observer;
+}
+
+/** The board never outgrows the screen, so a window resize can mean a refit. */
+function observeScreen(ctx: BoardContext, refit: DeferredFit): () => void {
+  const { win } = ctx;
+  const onResize = () => refit.schedule();
+  win?.addEventListener('resize', onResize);
+  return () => win?.removeEventListener('resize', onResize);
 }
 
 function observeVisibility(ctx: BoardContext): IntersectionObserver | undefined {

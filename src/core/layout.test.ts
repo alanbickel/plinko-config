@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildLayout, type Circle, dropXToBoard, type Layout, slotIndexAt } from './layout';
+import {
+  boardToDropX,
+  buildLayout,
+  type Circle,
+  dropXToBoard,
+  type Layout,
+  slotIndexAt,
+} from './layout';
 import { DEFAULT_BOARD } from './options';
 import type { ResolvedBoard } from './types';
 
@@ -96,6 +103,17 @@ describe('dropXToBoard', () => {
     expect(dropXToBoard(layout, 0) - layout.chipRadius).toBeGreaterThan(0);
     expect(dropXToBoard(layout, 1) + layout.chipRadius).toBeLessThan(7);
     expect(dropXToBoard(layout, 0.5)).toBeCloseTo(3.5);
+  });
+});
+
+describe('boardToDropX', () => {
+  it('inverts dropXToBoard and clamps past the walls', () => {
+    const layout = buildLayout(7, board());
+    for (const x of [0, 0.25, 0.5, 1]) {
+      expect(boardToDropX(layout, dropXToBoard(layout, x))).toBeCloseTo(x);
+    }
+    expect(boardToDropX(layout, -3)).toBe(0);
+    expect(boardToDropX(layout, 99)).toBe(1);
   });
 });
 

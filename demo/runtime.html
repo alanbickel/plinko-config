@@ -35,9 +35,28 @@
         gap: 1rem;
         align-items: start;
       }
-      /* A host with its own height: the board fits inside it (width and height). */
+      @media (max-width: 800px) {
+        main {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      /* A host with its own height: the board fits inside it (width and height). The stage is
+         the screen below the title; the host gets whatever the instructions leave. */
+      .stage {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 4rem);
+      }
+      .stage p {
+        margin: 0 0 0.5rem;
+      }
       #host {
-        height: calc(100vh - 7rem);
+        flex: 1;
+        min-height: 0;
+      }
+      /* A host without one: the board fills the width, but never outgrows the screen. */
+      .stage.auto-height {
+        height: auto;
       }
       aside {
         display: grid;
@@ -111,10 +130,14 @@
   <body>
     <h1>plinko-config · runtime debug</h1>
     <main>
-      <div>
+      <div class="stage">
         <p>
-          <a href="#host" id="skip">Focus the board</a> · Tab in, then: ←/→ choose, Enter pick up,
-          ←/→ aim (Shift = faster), Home/End, Enter/↓ drop, Esc put back. Tab leaves.
+          Pointer: drag a chip from the tray up into the glowing drop zone and let go. Let go over
+          the tray to put it back; anywhere else, it falls off the board.
+          <br />
+          Keyboard: <a href="#host" id="skip">focus the board</a> or Tab in, then ←/→ choose, Enter
+          pick up, ↑/↓ carry, ←/→ move across (Shift = faster), Home/End, Enter drop (only from the
+          drop zone!), Esc put back. Tab leaves.
         </p>
         <div id="host"></div>
       </div>
@@ -139,8 +162,11 @@
           <label><input type="checkbox" id="attribution" checked /> attribution</label>
           <label>seed <input type="number" id="seed" value="1" /></label>
           <label>slots <input type="number" id="slots" value="5" min="1" max="12" /></label>
+          <label><input type="checkbox" id="hostHeight" checked /> host has its own height</label>
           <label>aimStep <input type="number" id="aimStep" step="0.005" min="0.001" max="1" placeholder="auto" /></label>
           <label>aimStepLarge <input type="number" id="aimStepLarge" step="0.01" min="0.001" max="1" placeholder="auto" /></label>
+          <label>liftStep <input type="number" id="liftStep" step="0.01" min="0.001" max="1" placeholder="auto" /></label>
+          <label>liftStepLarge <input type="number" id="liftStepLarge" step="0.05" min="0.001" max="1" placeholder="auto" /></label>
         </section>
         <section>
           <h2>Supply (remount)</h2>

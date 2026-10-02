@@ -61,12 +61,19 @@ export interface Settled {
 export interface PlinkoOptions<CV = unknown, SV = unknown> extends CoreOptions<CV, SV> {
   /** Chips allowed in flight at once. Default Infinity. */
   maxInFlight?: number;
-  /** After a drop, pick up another chip of the same kind at the same spot. Default true. */
+  /**
+   * After a keyboard or handle drop, pick up another chip of the same kind at the same spot.
+   * Default true. A pointer drop never reloads: the finger has lifted.
+   */
   autoReload?: boolean;
   /** Arrow-key step, as a fraction of the drop width, in (0, 1]. Default ¼ slot. */
   aimStep?: number;
   /** Shift+arrow step, as a fraction of the drop width, in (0, 1]. Default 1 slot. */
   aimStepLarge?: number;
+  /** Up/down arrow step, as a fraction of the carry from tray to drop line, in (0, 1]. Default one peg row. */
+  liftStep?: number;
+  /** Shift+up/down step, as a fraction of the carry, in (0, 1]. Default four peg rows. */
+  liftStepLarge?: number;
   keys?: Partial<KeyBindings>;
   theme?: Partial<Theme>;
   labels?: Partial<Labels>;

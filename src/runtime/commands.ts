@@ -11,6 +11,8 @@ export interface HoldingState {
   kindId: string;
   /** Aim, 0..1 across the top of the board. */
   x: number;
+  /** Height on the carry path: 0 in the tray, 1 at the drop line. */
+  lift: number;
 }
 export interface LockedState {
   name: 'locked';
@@ -39,7 +41,16 @@ export interface CommandMachineInput {
   kindIds: readonly string[];
   maxInFlight: number;
   autoReload: boolean;
+  /** Lift where the drop zone starts; drops from below it lose the chip. */
+  dropZoneFrom: number;
   notify: (notice: Notice) => void;
+}
+
+export interface DropCommand {
+  /** Pick up the next chip of the kind straight away, if autoReload is on. Default true. */
+  reload?: boolean;
+  /** Move the chip into the drop zone first, without announcing it (scripted drops). */
+  carryUp?: boolean;
 }
 
 export interface PickedUpNotice {
@@ -54,6 +65,22 @@ export interface OutOfChipsNotice {
 export interface AimedNotice {
   type: 'aimed';
   x: number;
+}
+export interface LiftedNotice {
+  type: 'lifted';
+  lift: number;
+}
+/** The held chip moved into or out of the drop zone. */
+export interface ZoneChangedNotice {
+  type: 'zoneChanged';
+  inZone: boolean;
+}
+/** Dropped outside the drop zone: the chip is spent and falls off the board. */
+export interface LostNotice {
+  type: 'lost';
+  kindId: string;
+  x: number;
+  lift: number;
 }
 export interface CancelledNotice {
   type: 'cancelled';
@@ -84,6 +111,9 @@ export interface NoticeByType {
   pickedUp: PickedUpNotice;
   outOfChips: OutOfChipsNotice;
   aimed: AimedNotice;
+  lifted: LiftedNotice;
+  zoneChanged: ZoneChangedNotice;
+  lost: LostNotice;
   cancelled: CancelledNotice;
   busy: BusyNotice;
   dropped: DroppedNotice;
@@ -104,7 +134,7 @@ const FINAL: ReadonlySet<StateName> = new Set<StateName>(['locked', 'destroyed']
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 
 /** Rounded so repeated nudges don't leak float noise (0.20000000000000007) into payloads. */
-const roundAim = (x: number) => Math.round(clamp01(x) * 1e6) / 1e6;
+const round01 = (x: number) => Math.round(clamp01(x) * 1e6) / 1e6;
 
 export class CommandMachine {
   private current: HeldState = { name: 'idle' };
@@ -135,7 +165,7 @@ export class CommandMachine {
       return false;
     }
     this.lastKindId = kindId;
-    this.current = { name: 'holding', kindId, x: this.lastX };
+    this.current = { name: 'holding', kindId, x: this.lastX, lift: 0 };
     this.input.notify({ type: 'pickedUp', kindId, x: this.lastX });
     return true;
   }
@@ -143,7 +173,7 @@ export class CommandMachine {
   aim(x: number): void {
     const held = this.held();
     if (!held || !Number.isFinite(x)) return;
-    const next = roundAim(x);
+    const next = round01(x);
     if (next === held.x) return;
     this.lastX = next;
     this.current = { ...held, x: next };
@@ -155,22 +185,47 @@ export class CommandMachine {
     if (held) this.aim(held.x + dx);
   }
 
-  /** Returns the drop id, or undefined if nothing was dropped. */
-  drop(): number | undefined {
+  /** Carries the held chip up (positive) or down. */
+  lift(dy: number): void {
     const held = this.held();
+    if (held) this.liftTo(held.lift + dy);
+  }
+
+  liftTo(lift: number): void {
+    const held = this.held();
+    if (!held || !Number.isFinite(lift)) return;
+    const next = round01(lift);
+    if (next === held.lift) return;
+    const wasInZone = this.inZone(held);
+    this.current = { ...held, lift: next };
+    this.input.notify({ type: 'lifted', lift: next });
+    if (this.inZone(this.current) !== wasInZone) {
+      this.input.notify({ type: 'zoneChanged', inZone: !wasInZone });
+    }
+  }
+
+  /**
+   * Drops the held chip from the drop zone; outside it, the chip is lost. Returns the drop id, or
+   * undefined if nothing was dropped.
+   */
+  drop(command: DropCommand = {}): number | undefined {
+    const held = command.carryUp ? this.carryUp() : this.held();
     if (!held) return undefined;
-    const { ports, maxInFlight, autoReload, notify } = this.input;
-    if (ports.inFlight() >= maxInFlight) {
-      notify({ type: 'busy' });
+    if (!this.inZone(held)) {
+      this.loseHeld(held);
       return undefined;
     }
-    ports.commit(held.kindId);
-    const dropId = ports.spawn(held.kindId, held.x);
-    const reloaded = autoReload && ports.reserve(held.kindId);
-    this.current = reloaded ? held : { name: 'idle' };
-    notify({ type: 'dropped', kindId: held.kindId, x: held.x, dropId, reloaded });
-    if (autoReload && !reloaded) notify({ type: 'outOfChips', kindId: held.kindId });
-    return dropId;
+    if (this.input.ports.inFlight() >= this.input.maxInFlight) {
+      this.input.notify({ type: 'busy' });
+      return undefined;
+    }
+    return this.spawnHeld(held, command.reload ?? true);
+  }
+
+  /** The held chip falls off the board, wherever it is. */
+  lose(): void {
+    const held = this.held();
+    if (held) this.loseHeld(held);
   }
 
   cancel(): void {
@@ -193,6 +248,34 @@ export class CommandMachine {
     this.releaseHeld();
     this.current = { name: 'destroyed' };
     this.input.notify({ type: 'destroyed' });
+  }
+
+  private carryUp(): HoldingState | undefined {
+    const held = this.held();
+    if (held) this.current = { ...held, lift: 1 };
+    return this.held();
+  }
+
+  private inZone(held: HoldingState): boolean {
+    return held.lift >= this.input.dropZoneFrom;
+  }
+
+  private spawnHeld(held: HoldingState, reload: boolean): number {
+    const { ports, autoReload, notify } = this.input;
+    ports.commit(held.kindId);
+    const dropId = ports.spawn(held.kindId, held.x);
+    const reloading = reload && autoReload;
+    const reloaded = reloading && ports.reserve(held.kindId);
+    this.current = reloaded ? held : { name: 'idle' };
+    notify({ type: 'dropped', kindId: held.kindId, x: held.x, dropId, reloaded });
+    if (reloading && !reloaded) notify({ type: 'outOfChips', kindId: held.kindId });
+    return dropId;
+  }
+
+  private loseHeld(held: HoldingState): void {
+    this.input.ports.commit(held.kindId);
+    this.current = { name: 'idle' };
+    this.input.notify({ type: 'lost', kindId: held.kindId, x: held.x, lift: held.lift });
   }
 
   private held(): HoldingState | undefined {

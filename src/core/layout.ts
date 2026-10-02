@@ -39,7 +39,8 @@ export interface Layout {
   floorY: number;
 }
 
-const ROW_SPACING = Math.sqrt(3) / 2; // equilateral triangle lattice
+/** Vertical distance between peg rows: an equilateral triangle lattice. */
+export const ROW_SPACING = Math.sqrt(3) / 2;
 const FIRST_ROW_Y = 1.5;
 const SPAWN_Y = 0.5;
 /**
@@ -161,6 +162,11 @@ function buildFrame({ slotCount, board, lastRowY }: FrameSpec): Frame {
 /** Maps a drop position in [0, 1] to board x. */
 export function dropXToBoard(layout: Layout, x01: number): number {
   return lerp(layout.dropMinX, layout.dropMaxX, x01);
+}
+
+/** Maps board x to a drop position, clamped to [0, 1]. The inverse of dropXToBoard. */
+export function boardToDropX(layout: Layout, x: number): number {
+  return clamp((x - layout.dropMinX) / (layout.dropMaxX - layout.dropMinX), 0, 1);
 }
 
 /** Index of the slot column containing x. */

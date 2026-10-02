@@ -50,12 +50,12 @@
     {
       "name": "plinko-config",
       "path": "dist/index.js",
-      "limit": "12 kB"
+      "limit": "14 kB"
     },
     {
       "name": "plinko-config/element",
       "path": "dist/element.js",
-      "limit": "13 kB"
+      "limit": "15 kB"
     }
   ],
   "devDependencies": {

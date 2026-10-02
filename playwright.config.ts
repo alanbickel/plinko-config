@@ -14,11 +14,15 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  // Keyboard-only for now; a mobile project arrives with pointer input (M5).
+  // Keyboard specs skip themselves on mobile; pointer specs run on both, with touch on mobile.
   projects: [
     {
       name: 'desktop',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
+    },
+    {
+      name: 'mobile',
+      use: { ...devices['Pixel 7'] },
     },
   ],
   webServer: {

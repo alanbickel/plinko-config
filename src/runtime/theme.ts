@@ -13,6 +13,8 @@ export interface Theme {
   mutedText: string;
   focus: string;
   tray: string;
+  /** Where a held chip can be dropped from: outline and glow. */
+  dropZone: string;
   /** Background of the "board is full" banner. */
   overlay: string;
 }
@@ -30,6 +32,7 @@ export const DEFAULT_THEME: Theme = {
   mutedText: '#a3adbb',
   focus: '#7cc4ff',
   tray: '#1a2029',
+  dropZone: '#ffd166',
   overlay: 'rgba(17, 21, 28, 0.88)',
 };
 

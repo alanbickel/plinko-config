@@ -1,96 +1,67 @@
-// DOM listeners on the canvas: keys become actions; focus is tracked for the focus ring.
+// DOM listeners on the canvas: keys and pointer gestures become actions; focus is tracked for the
+// focus ring.
 
-import { announceSelected, type BoardContext, refresh } from '../context';
-import { dispatchByType, type HandlerMap } from '../dispatch';
-import { requestChips } from '../supply';
-import { interpretKey, type KeyAction, type KeyActionByType, type KeyContext } from './keyboard';
-
-type KeyActionHandlers = HandlerMap<KeyActionByType>;
+import type { BoardContext } from '../context';
+import { interpretKey, type KeyContext } from './keyboard';
+import { createPerform, type Perform } from './perform';
+import { attachPointer } from './pointer-dom';
 
 /** Listens on the canvas; returns a function that removes the listeners. */
 export function attachInput(ctx: BoardContext): () => void {
   const { canvas } = ctx.dom;
-  const handlers = keyActionHandlers(ctx);
-  const onKeyDown = (e: KeyboardEvent) => handleKey(ctx, { event: e, handlers });
-  const onFocus = () => setFocused(ctx, true);
+  const perform = createPerform(ctx);
+  const onKeyDown = (e: KeyboardEvent) => handleKey(ctx, { event: e, perform });
+  const onFocus = () => setFocused(ctx, focusVisible(canvas));
   const onBlur = () => setFocused(ctx, false);
   canvas.addEventListener('keydown', onKeyDown);
   canvas.addEventListener('focus', onFocus);
   canvas.addEventListener('blur', onBlur);
+  const detachPointer = attachPointer(ctx, perform);
   return () => {
     canvas.removeEventListener('keydown', onKeyDown);
     canvas.removeEventListener('focus', onFocus);
     canvas.removeEventListener('blur', onBlur);
+    detachPointer();
   };
 }
 
 interface KeyEventInput {
   event: KeyboardEvent;
-  handlers: KeyActionHandlers;
+  perform: Perform;
 }
 
-function handleKey(ctx: BoardContext, { event, handlers }: KeyEventInput): void {
+function handleKey(ctx: BoardContext, { event, perform }: KeyEventInput): void {
   // Modified keys belong to the browser and the host page.
   if (event.altKey || event.ctrlKey || event.metaKey) return;
+  // Focus that came from a click shows no ring until the keyboard is used.
+  if (!ctx.ui.focused) setFocused(ctx, true);
   const action = interpretKey(event, keyContext(ctx));
   if (!action) return;
   event.preventDefault();
-  if (ctx.machine.state.name === 'locked') {
-    refuseWhileLocked(ctx, action);
-    return;
-  }
-  dispatchByType(handlers, action);
-  refresh(ctx);
-}
-
-/** A locked board ignores keys, but trying to pick up repeats why. */
-function refuseWhileLocked(ctx: BoardContext, action: KeyAction): void {
-  if (action.type === 'pickUp') ctx.announcer.say(ctx.config.labels.locked);
-}
-
-function keyActionHandlers(ctx: BoardContext): KeyActionHandlers {
-  const { machine, ui } = ctx;
-  return {
-    select: ({ index }) => {
-      ui.selected = index;
-      announceSelected(ctx);
-    },
-    pickUp: ({ index }) => pickUpOrRequest(ctx, ctx.kindIds[index] ?? ''),
-    nudge: ({ dx }) => machine.nudge(dx),
-    aim: ({ x }) => machine.aim(x),
-    drop: () => {
-      machine.drop();
-    },
-    cancel: () => machine.cancel(),
-    zone: ({ zone }) => {
-      ui.zone = zone;
-      announceSelected(ctx);
-    },
-  };
-}
-
-/** Enter on an empty kind that can be requested asks for more; otherwise it picks one up. */
-function pickUpOrRequest(ctx: BoardContext, kindId: string): void {
-  if (ctx.supply.canRequest(kindId)) {
-    void requestChips(ctx, kindId);
-    return;
-  }
-  ctx.machine.pickUp(kindId);
+  perform([action]);
 }
 
 function keyContext(ctx: BoardContext): KeyContext {
   const { machine, ui, config, kindIds } = ctx;
-  const lastKind = machine.lastKind;
   return {
-    zone: ui.zone,
     holding: machine.state.name === 'holding',
     selected: ui.selected,
     kindCount: kindIds.length,
-    lastKindIndex: lastKind === undefined ? undefined : kindIds.indexOf(lastKind),
     aimStep: config.aimStep,
     aimStepLarge: config.aimStepLarge,
+    liftStep: config.liftStep,
+    liftStepLarge: config.liftStepLarge,
     keys: config.keys,
   };
+}
+
+/** Whether the browser would show a focus ring: focus by keyboard, not by click. */
+function focusVisible(el: Element): boolean {
+  try {
+    return el.matches(':focus-visible');
+  } catch {
+    return true; // No :focus-visible support: always show the ring.
+  }
 }
 
 function setFocused(ctx: BoardContext, focused: boolean): void {

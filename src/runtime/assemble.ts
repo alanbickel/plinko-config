@@ -16,6 +16,7 @@ import type { PlinkoOptions } from './types';
 import { Announcer } from './view/a11y';
 import { CanvasView } from './view/canvas';
 import { createDom } from './view/dom';
+import { carryPath } from './view/geometry';
 
 export interface AssembleInput {
   host: HTMLElement;
@@ -37,31 +38,27 @@ export function assemble({ host, options }: AssembleInput): BoardContext {
 function createBase({ host, options }: AssembleInput): BaseContext {
   const core = resolveCoreOptions(options);
   const { slots, chips } = core;
-  const config = resolveRuntimeConfig({ options, slotCount: slots.length });
-  const win = host.ownerDocument.defaultView;
   const layout = buildLayout(slots.length, core.board);
+  const config = resolveRuntimeConfig({ options, layout });
+  const win = host.ownerDocument.defaultView;
   const dom = createDom({ host, labels: config.labels, attribution: config.attribution });
   const theme = resolveTheme(options.theme, win?.getComputedStyle(host));
+  const reducedMotion = prefersReducedMotion(win);
   return {
     host,
     win,
+    reducedMotion,
     options,
     config,
     slots,
     chips,
     kindIds: chips.map((c) => c.id),
     world: new World({ layout, physics: core.physics }),
+    carry: carryPath(layout),
     supply: new Supply({ kinds: chips, refill: config.refill }),
     requests: new Map(),
     dom,
-    view: new CanvasView({
-      canvas: dom.canvas,
-      layout,
-      kinds: chips,
-      slots,
-      theme,
-      reducedMotion: prefersReducedMotion(win),
-    }),
+    view: new CanvasView({ canvas: dom.canvas, layout, kinds: chips, slots, theme, reducedMotion }),
     announcer: new Announcer({ live: dom.live, labels: config.labels }),
     ui: initialUiState(),
     settling: new Map(),
@@ -82,6 +79,7 @@ function createMachine(ctx: BoardContext): CommandMachine {
     kindIds: ctx.kindIds,
     maxInFlight: ctx.config.maxInFlight,
     autoReload: ctx.config.autoReload,
+    dropZoneFrom: ctx.carry.zoneFrom,
     notify: (notice: Notice) => {
       dispatchByType(handlers, notice);
       (CHANGES_SUPPLY.has(notice.type) ? supplyChanged : refresh)(ctx);
@@ -94,6 +92,7 @@ const CHANGES_SUPPLY: ReadonlySet<keyof NoticeByType> = new Set<keyof NoticeByTy
   'pickedUp',
   'cancelled',
   'dropped',
+  'lost',
   'locked',
 ]);
 

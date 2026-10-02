@@ -1,18 +1,28 @@
 // Draws the whole interactive board, tray included, on one canvas. Units are board units
 // (see core/types.ts); the view maps them to device pixels.
 
-import { type Circle, dropXToBoard, type Layout } from '../../core/layout';
+import { boardToDropX, type Circle, dropXToBoard, type Layout } from '../../core/layout';
 import type { ChipKindConfig, SlotConfig } from '../../core/types';
 import type { ChipBody } from '../../core/world';
-import type { Zone } from '../input/keyboard';
+import type { Zone } from '../input/actions';
 import type { Theme } from '../theme';
+import {
+  type BoardPoint,
+  type CarryPath,
+  carryPath,
+  computeViewport,
+  FALL_MS,
+  type FallingChip,
+  FLOOR,
+  LABEL_H,
+  liftToY,
+  TRAY_CHIP_DY,
+  TRAY_H,
+  type Viewport,
+  yToLift,
+} from './geometry';
 
-const SIDE = 0.25; // margin left and right of the walls
-const TOP = 0.9; // space above the drop line for the held chip
 const WALL = 0.12; // drawn wall thickness (the physics walls are thicker)
-const FLOOR = 0.15;
-const LABEL_H = 0.7; // slot label strip
-const TRAY_H = 1.95;
 const TRAY_CHIP_R = 0.32;
 const FONT = '0.26px system-ui, sans-serif';
 const NOTE_FONT = '0.2px system-ui, sans-serif';
@@ -26,12 +36,21 @@ export interface HeldChip {
   kindId: string;
   /** Aim, 0..1 across the top of the board. */
   x: number;
+  /** Height on the carry path, 0 (tray) to 1 (drop line). */
+  lift: number;
+  /** Under the pointer during a drag, board units; otherwise drawn from x and lift. */
+  at: BoardPoint | undefined;
 }
+
+/** The drop zone: hidden with nothing held, outlined while holding, lit with the chip inside. */
+export type DropZoneLook = 'hidden' | 'shown' | 'lit';
 
 export interface FrameState {
   flying: readonly ChipBody[];
   settled: readonly ChipBody[];
   held: HeldChip | undefined;
+  dropZone: DropZoneLook;
+  falling: readonly FallingChip[];
   selected: number;
   zone: Zone;
   focused: boolean;
@@ -47,6 +66,24 @@ export interface FrameState {
   now: number;
 }
 
+/** A point on the canvas in CSS pixels, from its top-left corner. */
+export interface CssPoint {
+  x: number;
+  y: number;
+}
+/** What's under a point on the canvas. */
+export interface Hit {
+  /** The tray strip at the bottom, or anywhere above it. */
+  zone: Zone;
+  /** The tray column under the point (the nearest one from the side margins). */
+  index: number;
+  /** Drop position, 0..1, clamped to the drop range. */
+  x: number;
+  /** Height on the carry path, clamped to [0, 1]. */
+  lift: number;
+  point: BoardPoint;
+}
+
 export interface CanvasViewInput {
   canvas: HTMLCanvasElement;
   layout: Layout;
@@ -56,18 +93,10 @@ export interface CanvasViewInput {
   reducedMotion: boolean;
 }
 
-/** The drawn area, in board units. */
-interface Viewport {
-  x0: number;
-  y0: number;
-  w: number;
-  h: number;
-  trayY: number;
-}
-
 interface PainterInput extends CanvasViewInput {
   g: CanvasRenderingContext2D;
   viewport: Viewport;
+  carry: CarryPath;
 }
 
 interface Stroke {
@@ -75,21 +104,20 @@ interface Stroke {
   width: number;
 }
 
-function computeViewport(layout: Layout): Viewport {
-  const y0 = layout.spawnY - TOP;
-  const trayY = layout.floorY + FLOOR + LABEL_H;
-  return { x0: -SIDE, y0, w: layout.width + 2 * SIDE, h: trayY + TRAY_H - y0, trayY };
-}
-
 export class CanvasView {
   private readonly viewport: Viewport;
+  private readonly carry: CarryPath;
   /** Absent when there's no 2D context (e.g. jsdom); the view then just doesn't draw. */
   private readonly painter: Painter | undefined;
+  /** Width on the page, CSS pixels; set by resize. */
+  private cssWidth = 1;
 
   constructor(private readonly input: CanvasViewInput) {
     this.viewport = computeViewport(input.layout);
+    this.carry = carryPath(input.layout);
     const g = input.canvas.getContext('2d');
-    this.painter = g ? new Painter({ ...input, g, viewport: this.viewport }) : undefined;
+    const painterInput = { ...input, g, viewport: this.viewport, carry: this.carry };
+    this.painter = g ? new Painter({ ...painterInput, g }) : undefined;
   }
 
   /** Width ÷ height of everything drawn, tray included. */
@@ -100,6 +128,7 @@ export class CanvasView {
   /** Sizes the backing store for a CSS width; returns the CSS height to use. */
   resize(cssWidth: number, dpr: number): number {
     const { canvas } = this.input;
+    this.cssWidth = cssWidth;
     const cssHeight = (cssWidth * this.viewport.h) / this.viewport.w;
     canvas.width = Math.max(1, Math.round(cssWidth * dpr));
     canvas.height = Math.max(1, Math.round(cssHeight * dpr));
@@ -109,6 +138,23 @@ export class CanvasView {
 
   render(frame: FrameState): void {
     this.painter?.paint(frame);
+  }
+
+  /** What's under a point, or null outside the canvas. */
+  hitTest(css: CssPoint): Hit | null {
+    const { layout, kinds } = this.input;
+    const { x0, y0, w, h, trayY } = this.viewport;
+    const scale = w / this.cssWidth;
+    const point = { x: x0 + css.x * scale, y: y0 + css.y * scale };
+    if (point.x < x0 || point.x > x0 + w || point.y < y0 || point.y > y0 + h) return null;
+    const column = Math.floor((point.x / layout.width) * kinds.length);
+    return {
+      zone: point.y < trayY ? 'board' : 'tray',
+      index: Math.min(kinds.length - 1, Math.max(0, column)),
+      x: boardToDropX(layout, point.x),
+      lift: yToLift(this.carry, point.y),
+      point,
+    };
   }
 }
 
@@ -126,13 +172,16 @@ class Painter {
 
   paint(frame: FrameState): void {
     this.clear();
+    this.drawDropZone(frame.dropZone);
     this.drawFrame();
     this.drawRails();
     this.drawPegs(frame);
     this.drawChips(frame);
-    this.drawHeld(frame);
     this.drawSlotLabels();
     this.drawTray(frame);
+    // In hand and falling chips pass in front of everything, the tray included.
+    this.drawHeld(frame);
+    this.drawFalling(frame);
     if (frame.lockedMessage) this.drawBanner(frame.lockedMessage);
   }
 
@@ -179,16 +228,47 @@ class Painter {
     for (const c of frame.flying) this.chip({ ...interpolate(c, frame.alpha), r }, c.kindId);
   }
 
+  /** The band a chip can drop from: outlined while one is held, lit while it's inside. */
+  private drawDropZone(look: DropZoneLook): void {
+    if (look === 'hidden') return;
+    const { g, layout, theme, viewport, carry } = this.input;
+    const lit = look === 'lit';
+    const y = viewport.y0 + 0.05;
+    const h = carry.zoneY - y;
+    g.globalAlpha = lit ? 0.18 : 0;
+    g.fillStyle = theme.dropZone;
+    g.fillRect(0, y, layout.width, h);
+    g.globalAlpha = lit ? 1 : 0.45;
+    g.setLineDash(lit ? [] : [0.15, 0.12]);
+    g.strokeStyle = theme.dropZone;
+    g.lineWidth = lit ? 0.05 : 0.03;
+    g.strokeRect(0, y, layout.width, h);
+    g.setLineDash([]);
+    g.globalAlpha = 1;
+  }
+
   private drawHeld(frame: FrameState): void {
-    const { layout } = this.input;
+    const { layout, carry } = this.input;
     if (!frame.held) return;
-    const at: Circle = {
-      x: dropXToBoard(layout, frame.held.x),
-      y: layout.spawnY,
-      r: layout.chipRadius,
-    };
-    this.chip(at, frame.held.kindId);
-    if (frame.focused && frame.zone === 'board') this.ring(grow(at, 0.1), this.focusStroke());
+    const { x, lift, at, kindId } = frame.held;
+    const centre = at ?? { x: dropXToBoard(layout, x), y: liftToY(carry, lift) };
+    const circle: Circle = { ...centre, r: layout.chipRadius };
+    this.chip(circle, kindId);
+    if (frame.focused && !at) this.ring(grow(circle, 0.1), this.focusStroke());
+  }
+
+  /** Lost chips drop off the bottom of the canvas (or fade where they are, for reduced motion). */
+  private drawFalling(frame: FrameState): void {
+    const { g, layout, viewport, reducedMotion } = this.input;
+    const r = layout.chipRadius;
+    const bottom = viewport.y0 + viewport.h + r;
+    for (const chip of frame.falling) {
+      const t = Math.min(1, (frame.now - chip.startedAt) / FALL_MS);
+      const y = reducedMotion ? chip.from.y : chip.from.y + (bottom - chip.from.y) * t * t;
+      g.globalAlpha = reducedMotion ? 1 - t : 1;
+      this.chip({ x: chip.from.x, y, r }, chip.kindId);
+    }
+    g.globalAlpha = 1;
   }
 
   private drawSlotLabels(): void {
@@ -214,7 +294,7 @@ class Painter {
     const cell = layout.width / kinds.length;
     const at: Circle = {
       x: cell * (index + 0.5),
-      y: this.input.viewport.trayY + 0.65,
+      y: this.input.viewport.trayY + TRAY_CHIP_DY,
       r: TRAY_CHIP_R,
     };
     const selected = index === frame.selected;

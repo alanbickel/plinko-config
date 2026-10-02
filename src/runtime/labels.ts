@@ -35,6 +35,12 @@ export interface Labels {
   pickedUp: ChipLabel;
   cancelled: ChipLabel;
   dropped: ChipLabel;
+  /** The held chip was carried into the drop zone. */
+  enteredDropZone: string;
+  /** The held chip was carried out of the drop zone. */
+  leftDropZone: string;
+  /** Dropped outside the drop zone: the chip is gone. */
+  fellOff: ChipLabel;
   landed: (input: LandingLabelInput) => string;
   missed: ChipLabel;
   /** Several settled close together (rapid fire), batched into one announcement. */
@@ -58,13 +64,17 @@ export interface Labels {
 export const DEFAULT_LABELS: Labels = {
   board: 'Plinko preferences board',
   instructions:
-    'Left and right arrows choose a chip; Enter picks it up. Then arrows aim, Shift with arrows ' +
-    'moves faster, Home and End jump to the edges, Enter drops, Escape puts the chip back.',
+    'Left and right arrows choose a chip; Enter picks it up. Up and down arrows carry it, left ' +
+    'and right move it across, Shift with arrows moves faster, Home and End jump to the edges. ' +
+    'Enter drops, Escape puts the chip back.',
   selected: (input) => `${input.chip.label} chip${stock(input)}.`,
   pickedUp: ({ chip }) =>
-    `Picked up ${article(chip.label)} ${chip.label} chip. Arrows to aim, Enter to drop.`,
+    `Picked up ${article(chip.label)} ${chip.label} chip. Up arrow carries it to the top.`,
   cancelled: ({ chip }) => `Put the ${chip.label} chip back.`,
   dropped: () => 'Dropped.',
+  enteredDropZone: 'Over the drop zone. Release or press Enter to drop.',
+  leftDropZone: 'Left the drop zone.',
+  fellOff: ({ chip }) => `The ${chip.label} chip fell off the board.`,
   landed: ({ chip, slot }) => `${chip.label} chip landed in ${slot.label}.`,
   missed: ({ chip }) => `The ${chip.label} chip didn't make it into a slot.`,
   settledBatch: ({ landed, missed }) => {

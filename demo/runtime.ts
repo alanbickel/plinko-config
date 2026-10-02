@@ -106,6 +106,8 @@ function boardOptions(): PlinkoOptions {
     attribution: input('attribution').checked,
     aimStep: optionalNumber('aimStep'),
     aimStepLarge: optionalNumber('aimStepLarge'),
+    liftStep: optionalNumber('liftStep'),
+    liftStepLarge: optionalNumber('liftStepLarge'),
     onPickUp: ({ chip }) => {
       selectedKind = chip.id;
       log('onPickUp', chip.id);
@@ -180,12 +182,17 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-call]')
   button.addEventListener('click', () => calls[button.dataset.call ?? '']?.());
 }
 const REMOUNT_ON_CHANGE = [
-  ...['autoReload', 'attribution', 'seed', 'slots', 'aimStep', 'aimStepLarge'],
+  ...['autoReload', 'attribution', 'seed', 'slots'],
+  ...['aimStep', 'aimStepLarge', 'liftStep', 'liftStepLarge'],
   ...['countOn', 'countOff', 'refill', 'everyMs', 'answer'],
 ];
 for (const id of REMOUNT_ON_CHANGE) {
   $(id).addEventListener('change', mount);
 }
+// No remount: the board refits when its host changes size.
+$('hostHeight').addEventListener('change', () => {
+  host.parentElement?.classList.toggle('auto-height', !input('hostHeight').checked);
+});
 $('skip').addEventListener('click', (e) => {
   e.preventDefault();
   board?.element.querySelector('canvas')?.focus();

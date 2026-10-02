@@ -54,7 +54,8 @@ function drop(ctx: BoardContext, options: DropOptions): Promise<Settled> {
   if (!machine.pickUp(kindId)) return fail(`can't pick up "${kindId}" (${stateBefore})`);
   if (options.x !== undefined) machine.aim(options.x);
   ui.pendingSeed = options.seed;
-  const dropId = machine.drop();
+  // Scripted drops go straight to the drop zone; only people can lose chips.
+  const dropId = machine.drop({ carryUp: true });
   ui.pendingSeed = undefined;
   if (dropId === undefined) return fail(`can't drop (${machine.state.name})`);
   return new Promise<Settled>((resolve) => ctx.settling.set(dropId, resolve));
