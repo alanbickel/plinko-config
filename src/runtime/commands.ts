@@ -1,12 +1,28 @@
 // The held-chip state machine (ARCHITECTURE.md §5). Keyboard, pointer, and handle calls all feed
 // it. Pure: no DOM. In-flight chips live in the world, not here, which is what allows rapid fire.
 
-export type HeldState =
-  | { name: 'loading' }
-  | { name: 'idle' }
-  | { name: 'holding'; kindId: string; x: number }
-  | { name: 'locked' }
-  | { name: 'destroyed' };
+import type { HandlerMap } from './dispatch';
+
+export interface LoadingState {
+  name: 'loading';
+}
+export interface IdleState {
+  name: 'idle';
+}
+export interface HoldingState {
+  name: 'holding';
+  kindId: string;
+  /** Aim, 0..1 across the top of the board. */
+  x: number;
+}
+export interface LockedState {
+  name: 'locked';
+}
+export interface DestroyedState {
+  name: 'destroyed';
+}
+
+export type HeldState = LoadingState | IdleState | HoldingState | LockedState | DestroyedState;
 
 /** What the machine needs from the rest of the board. */
 export interface CommandPorts {
@@ -21,25 +37,81 @@ export interface CommandPorts {
   spawn(kindId: string, x: number): number;
 }
 
-export interface CommandOptions {
+export interface CommandMachineInput {
+  ports: CommandPorts;
   kindIds: readonly string[];
   maxInFlight: number;
   autoReload: boolean;
+  notify: (notice: Notice) => void;
+}
+
+export interface ReadyNotice {
+  type: 'ready';
+}
+export interface PickedUpNotice {
+  type: 'pickedUp';
+  kindId: string;
+  x: number;
+}
+export interface OutOfChipsNotice {
+  type: 'outOfChips';
+  kindId: string;
+}
+export interface AimedNotice {
+  type: 'aimed';
+  x: number;
+}
+export interface CancelledNotice {
+  type: 'cancelled';
+  kindId: string;
+}
+export interface BusyNotice {
+  type: 'busy';
+}
+export interface DroppedNotice {
+  type: 'dropped';
+  kindId: string;
+  x: number;
+  dropId: number;
+  /** Another chip of the same kind was picked up straight away (autoReload). */
+  reloaded: boolean;
+}
+export interface LockedNotice {
+  type: 'locked';
+  /** Kind of the chip that was put back in the tray, if one was held. */
+  returnedKindId?: string;
+}
+export interface DestroyedNotice {
+  type: 'destroyed';
+}
+
+/** Every notice, keyed by its type. */
+export interface NoticeByType {
+  ready: ReadyNotice;
+  pickedUp: PickedUpNotice;
+  outOfChips: OutOfChipsNotice;
+  aimed: AimedNotice;
+  cancelled: CancelledNotice;
+  busy: BusyNotice;
+  dropped: DroppedNotice;
+  locked: LockedNotice;
+  destroyed: DestroyedNotice;
 }
 
 /** What happened, for announcements, callbacks, and rendering. */
-export type Notice =
-  | { type: 'ready' }
-  | { type: 'pickedUp'; kindId: string; x: number }
-  | { type: 'outOfChips'; kindId: string }
-  | { type: 'aimed'; x: number }
-  | { type: 'cancelled'; kindId: string }
-  | { type: 'busy' }
-  | { type: 'dropped'; kindId: string; x: number; dropId: number; reloaded: boolean }
-  | { type: 'locked'; returnedKindId?: string }
-  | { type: 'destroyed' };
+export type Notice = NoticeByType[keyof NoticeByType];
+
+/** One handler per notice type; leaving one out is a compile error. */
+export type NoticeHandlers = HandlerMap<NoticeByType>;
+
+type StateName = HeldState['name'];
+const ACCEPTS_COMMANDS: ReadonlySet<StateName> = new Set<StateName>(['idle', 'holding']);
+const FINAL: ReadonlySet<StateName> = new Set<StateName>(['locked', 'destroyed']);
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+
+/** Rounded so repeated nudges don't leak float noise (0.20000000000000007) into payloads. */
+const roundAim = (x: number) => Math.round(clamp01(x) * 1e6) / 1e6;
 
 export class CommandMachine {
   private current: HeldState = { name: 'loading' };
@@ -48,11 +120,7 @@ export class CommandMachine {
   /** Most recently picked-up kind, for "pick up again" on the board. */
   private lastKindId: string | undefined;
 
-  constructor(
-    private readonly ports: CommandPorts,
-    private readonly options: CommandOptions,
-    private readonly notify: (notice: Notice) => void,
-  ) {}
+  constructor(private readonly input: CommandMachineInput) {}
 
   get state(): HeldState {
     return this.current;
@@ -66,88 +134,90 @@ export class CommandMachine {
   ready(): void {
     if (this.current.name !== 'loading') return;
     this.current = { name: 'idle' };
-    this.notify({ type: 'ready' });
+    this.input.notify({ type: 'ready' });
   }
 
   /** Returns false if the kind is unknown, none are left, or the board can't take commands. */
   pickUp(kindId: string): boolean {
-    const s = this.current;
-    if (s.name !== 'idle' && s.name !== 'holding') return false;
-    if (!this.options.kindIds.includes(kindId)) return false;
-    if (s.name === 'holding') {
-      if (s.kindId === kindId) return true;
-      this.ports.release(s.kindId);
-      this.current = { name: 'idle' };
-    }
-    if (!this.ports.reserve(kindId)) {
-      this.notify({ type: 'outOfChips', kindId });
+    if (!ACCEPTS_COMMANDS.has(this.current.name)) return false;
+    if (!this.input.kindIds.includes(kindId)) return false;
+    if (this.held()?.kindId === kindId) return true;
+    this.releaseHeld();
+    this.current = { name: 'idle' };
+    if (!this.input.ports.reserve(kindId)) {
+      this.input.notify({ type: 'outOfChips', kindId });
       return false;
     }
     this.lastKindId = kindId;
     this.current = { name: 'holding', kindId, x: this.lastX };
-    this.notify({ type: 'pickedUp', kindId, x: this.lastX });
+    this.input.notify({ type: 'pickedUp', kindId, x: this.lastX });
     return true;
   }
 
   aim(x: number): void {
-    const s = this.current;
-    if (s.name !== 'holding' || !Number.isFinite(x)) return;
-    // Rounded so repeated nudges don't leak float noise (0.20000000000000007) into payloads.
-    const next = Math.round(clamp01(x) * 1e6) / 1e6;
-    if (next === s.x) return;
+    const held = this.held();
+    if (!held || !Number.isFinite(x)) return;
+    const next = roundAim(x);
+    if (next === held.x) return;
     this.lastX = next;
-    this.current = { ...s, x: next };
-    this.notify({ type: 'aimed', x: next });
+    this.current = { ...held, x: next };
+    this.input.notify({ type: 'aimed', x: next });
   }
 
   nudge(dx: number): void {
-    const s = this.current;
-    if (s.name === 'holding') this.aim(s.x + dx);
+    const held = this.held();
+    if (held) this.aim(held.x + dx);
   }
 
   /** Returns the drop id, or undefined if nothing was dropped. */
   drop(): number | undefined {
-    const s = this.current;
-    if (s.name !== 'holding') return undefined;
-    if (this.ports.inFlight() >= this.options.maxInFlight) {
-      this.notify({ type: 'busy' });
+    const held = this.held();
+    if (!held) return undefined;
+    const { ports, maxInFlight, autoReload, notify } = this.input;
+    if (ports.inFlight() >= maxInFlight) {
+      notify({ type: 'busy' });
       return undefined;
     }
-    this.ports.commit(s.kindId);
-    const dropId = this.ports.spawn(s.kindId, s.x);
-    const reloaded = this.options.autoReload && this.ports.reserve(s.kindId);
-    this.current = reloaded ? s : { name: 'idle' };
-    this.notify({ type: 'dropped', kindId: s.kindId, x: s.x, dropId, reloaded });
-    if (this.options.autoReload && !reloaded) this.notify({ type: 'outOfChips', kindId: s.kindId });
+    ports.commit(held.kindId);
+    const dropId = ports.spawn(held.kindId, held.x);
+    const reloaded = autoReload && ports.reserve(held.kindId);
+    this.current = reloaded ? held : { name: 'idle' };
+    notify({ type: 'dropped', kindId: held.kindId, x: held.x, dropId, reloaded });
+    if (autoReload && !reloaded) notify({ type: 'outOfChips', kindId: held.kindId });
     return dropId;
   }
 
   cancel(): void {
-    const s = this.current;
-    if (s.name !== 'holding') return;
-    this.ports.release(s.kindId);
+    const kindId = this.releaseHeld();
+    if (kindId === undefined) return;
     this.current = { name: 'idle' };
-    this.notify({ type: 'cancelled', kindId: s.kindId });
+    this.input.notify({ type: 'cancelled', kindId });
   }
 
   /** The board is full: put any held chip back and refuse everything from now on. */
   lock(): void {
-    const s = this.current;
-    if (s.name === 'locked' || s.name === 'destroyed') return;
-    let returnedKindId: string | undefined;
-    if (s.name === 'holding') {
-      this.ports.release(s.kindId);
-      returnedKindId = s.kindId;
-    }
+    if (FINAL.has(this.current.name)) return;
+    const returnedKindId = this.releaseHeld();
     this.current = { name: 'locked' };
-    this.notify({ type: 'locked', returnedKindId });
+    this.input.notify({ type: 'locked', returnedKindId });
   }
 
   destroy(): void {
-    const s = this.current;
-    if (s.name === 'destroyed') return;
-    if (s.name === 'holding') this.ports.release(s.kindId);
+    if (this.current.name === 'destroyed') return;
+    this.releaseHeld();
     this.current = { name: 'destroyed' };
-    this.notify({ type: 'destroyed' });
+    this.input.notify({ type: 'destroyed' });
+  }
+
+  private held(): HoldingState | undefined {
+    return this.current.name === 'holding' ? this.current : undefined;
+  }
+
+  /** Returns a held chip to the tray. Gives back its kind, or undefined if nothing was held. */
+  private releaseHeld(): string | undefined {
+    const held = this.held();
+    if (!held) return undefined;
+    this.input.ports.release(held.kindId);
+    return held.kindId;
   }
 }

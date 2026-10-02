@@ -37,55 +37,97 @@ export interface KeyContext {
   lastKindIndex: number | undefined;
   aimStep: number;
   aimStepLarge: number;
+  keys: KeyBindings;
 }
-
-export type KeyAction =
-  | { type: 'select'; index: number }
-  | { type: 'pickUp'; index: number }
-  | { type: 'nudge'; dx: number }
-  | { type: 'aim'; x: number }
-  | { type: 'drop' }
-  | { type: 'cancel' }
-  | { type: 'zone'; zone: Zone };
 
 export interface KeyInput {
   key: string;
   shiftKey: boolean;
 }
 
-export function interpretKey(
-  input: KeyInput,
-  ctx: KeyContext,
-  keys: KeyBindings = DEFAULT_KEYS,
-): KeyAction | null {
-  const is = (action: keyof KeyBindings) => keys[action].includes(input.key);
+export interface SelectAction {
+  type: 'select';
+  index: number;
+}
+export interface PickUpAction {
+  type: 'pickUp';
+  index: number;
+}
+export interface NudgeAction {
+  type: 'nudge';
+  dx: number;
+}
+export interface AimAction {
+  type: 'aim';
+  x: number;
+}
+export interface DropAction {
+  type: 'drop';
+}
+export interface CancelAction {
+  type: 'cancel';
+}
+export interface ZoneAction {
+  type: 'zone';
+  zone: Zone;
+}
 
-  if (ctx.zone === 'tray') {
-    if (is('left') || is('right')) {
-      const dir = is('left') ? -1 : 1;
-      const index = (ctx.selected + dir + ctx.kindCount) % ctx.kindCount;
-      return { type: 'select', index };
-    }
-    if (is('pickUp')) return { type: 'pickUp', index: ctx.selected };
-    return null;
-  }
+/** Every key action, keyed by its type. */
+export interface KeyActionByType {
+  select: SelectAction;
+  pickUp: PickUpAction;
+  nudge: NudgeAction;
+  aim: AimAction;
+  drop: DropAction;
+  cancel: CancelAction;
+  zone: ZoneAction;
+}
 
-  if (ctx.holding) {
-    if (is('left') || is('right')) {
-      const step = input.shiftKey ? ctx.aimStepLarge : ctx.aimStep;
-      return { type: 'nudge', dx: is('left') ? -step : step };
-    }
-    if (is('home')) return { type: 'aim', x: 0 };
-    if (is('end')) return { type: 'aim', x: 1 };
-    if (is('drop')) return { type: 'drop' };
-    if (is('cancel')) return { type: 'cancel' };
-    return null;
-  }
+export type KeyAction = KeyActionByType[keyof KeyActionByType];
 
+type Binding = keyof KeyBindings;
+type Resolver = (input: KeyInput, ctx: KeyContext) => KeyAction;
+/** Bound actions in priority order: the first binding that matches the key wins. */
+type ActionTable = readonly (readonly [Binding, Resolver])[];
+type Mode = 'tray' | 'holding' | 'emptyHanded';
+
+const selectBy =
+  (dir: number): Resolver =>
+  (_, ctx) => ({ type: 'select', index: (ctx.selected + dir + ctx.kindCount) % ctx.kindCount });
+
+const nudgeBy =
+  (dir: number): Resolver =>
+  (input, ctx) => ({ type: 'nudge', dx: dir * (input.shiftKey ? ctx.aimStepLarge : ctx.aimStep) });
+
+const TABLES: Record<Mode, ActionTable> = {
+  tray: [
+    ['left', selectBy(-1)],
+    ['right', selectBy(1)],
+    ['pickUp', (_, ctx) => ({ type: 'pickUp', index: ctx.selected })],
+  ],
+  holding: [
+    ['left', nudgeBy(-1)],
+    ['right', nudgeBy(1)],
+    ['home', () => ({ type: 'aim', x: 0 })],
+    ['end', () => ({ type: 'aim', x: 1 })],
+    ['drop', () => ({ type: 'drop' })],
+    ['cancel', () => ({ type: 'cancel' })],
+  ],
   // Board zone with nothing held, e.g. after a drop without auto-reload.
-  if (is('pickUp')) return { type: 'pickUp', index: ctx.lastKindIndex ?? ctx.selected };
-  if (is('cancel')) return { type: 'zone', zone: 'tray' };
-  return null;
+  emptyHanded: [
+    ['pickUp', (_, ctx) => ({ type: 'pickUp', index: ctx.lastKindIndex ?? ctx.selected })],
+    ['cancel', () => ({ type: 'zone', zone: 'tray' })],
+  ],
+};
+
+export function interpretKey(input: KeyInput, ctx: KeyContext): KeyAction | null {
+  const match = TABLES[modeOf(ctx)].find(([binding]) => ctx.keys[binding].includes(input.key));
+  return match ? match[1](input, ctx) : null;
+}
+
+function modeOf(ctx: KeyContext): Mode {
+  if (ctx.zone === 'tray') return 'tray';
+  return ctx.holding ? 'holding' : 'emptyHanded';
 }
 
 /** Fills in defaults for any actions the host didn't rebind. */

@@ -1,13 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { CommandMachine, type CommandOptions, type Notice } from './commands';
+import { CommandMachine, type CommandPorts, type Notice } from './commands';
 
-function setup(opts: Partial<CommandOptions> & { stock?: Record<string, number> } = {}) {
+interface SetupInput {
+  maxInFlight?: number;
+  autoReload?: boolean;
+  /** Chips available per kind; unlimited when not given. */
+  stock?: Record<string, number>;
+}
+
+interface Spawned {
+  kindId: string;
+  x: number;
+}
+
+interface Harness {
+  machine: CommandMachine;
+  notices: Notice[];
+  stock: Record<string, number>;
+  reserved: Record<string, number>;
+  spawned: Spawned[];
+  setFlying: (n: number) => void;
+}
+
+function setup(opts: SetupInput = {}): Harness {
   const stock: Record<string, number> = { on: Infinity, off: Infinity, ...opts.stock };
   const reserved: Record<string, number> = {};
-  const spawned: { kindId: string; x: number }[] = [];
+  const spawned: Spawned[] = [];
   let flying = 0;
   const notices: Notice[] = [];
-  const ports = {
+  const ports: CommandPorts = {
     reserve(kindId: string) {
       if ((stock[kindId] ?? 0) <= 0) return false;
       stock[kindId] = (stock[kindId] ?? 0) - 1;
@@ -28,11 +49,13 @@ function setup(opts: Partial<CommandOptions> & { stock?: Record<string, number> 
       return spawned.length - 1;
     },
   };
-  const machine = new CommandMachine(
+  const machine = new CommandMachine({
     ports,
-    { kindIds: ['on', 'off'], maxInFlight: Infinity, autoReload: false, ...opts },
-    (n) => notices.push(n),
-  );
+    kindIds: ['on', 'off'],
+    maxInFlight: opts.maxInFlight ?? Infinity,
+    autoReload: opts.autoReload ?? false,
+    notify: (n) => notices.push(n),
+  });
   return {
     machine,
     notices,
@@ -45,7 +68,7 @@ function setup(opts: Partial<CommandOptions> & { stock?: Record<string, number> 
   };
 }
 
-const ready = (t: ReturnType<typeof setup>) => {
+const ready = (t: Harness): Harness => {
   t.machine.ready();
   t.notices.length = 0;
   return t;

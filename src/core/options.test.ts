@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_BOARD, DEFAULT_PHYSICS, PlinkoConfigError, resolveCoreOptions } from './options';
+import { DEFAULT_BOARD, DEFAULT_PHYSICS, resolveCoreOptions } from './options';
 import type { CoreOptions } from './types';
+import { PlinkoConfigError } from './validate';
 
 const base = (): CoreOptions => ({
   slots: [
@@ -12,6 +13,17 @@ const base = (): CoreOptions => ({
 });
 
 const withOptions = (extra: Partial<CoreOptions>) => resolveCoreOptions({ ...base(), ...extra });
+
+/** A rejected-options case, written compactly as [name, options, expected message]. */
+type RejectRow = [name: string, extra: Partial<CoreOptions>, message: RegExp];
+
+interface RejectCase {
+  name: string;
+  extra: Partial<CoreOptions>;
+  message: RegExp;
+}
+
+const asCase = ([name, extra, message]: RejectRow): RejectCase => ({ name, extra, message });
 
 describe('resolveCoreOptions', () => {
   it('applies defaults', () => {
@@ -44,7 +56,7 @@ describe('resolveCoreOptions', () => {
     expect(r.slots).toBe(slots);
   });
 
-  it.each<[string, Partial<CoreOptions>, RegExp]>([
+  const rows: RejectRow[] = [
     ['empty slots', { slots: [] }, /slots must be a non-empty array/],
     ['empty chips', { chips: [] }, /chips must be a non-empty array/],
     [
@@ -75,7 +87,8 @@ describe('resolveCoreOptions', () => {
     ['fractional seed', { physics: { seed: 1.5 } }, /seed/],
     ['bias for unknown slot', { physics: { bias: { nope: 2 } } }, /unknown slot "nope"/],
     ['negative bias', { physics: { bias: { a: -1 } } }, /bias\["a"\]/],
-  ])('rejects %s', (_, extra, message) => {
+  ];
+  it.each<RejectCase>(rows.map(asCase))('rejects $name', ({ extra, message }) => {
     expect(() => withOptions(extra)).toThrow(PlinkoConfigError);
     expect(() => withOptions(extra)).toThrow(message);
   });

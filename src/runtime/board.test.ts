@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PlinkoConfigError } from '../core/options';
+import { PlinkoConfigError } from '../core/validate';
 import { createPlinko } from './board';
 import type { PlinkoBoard, PlinkoOptions } from './types';
 import { BATCH_MS } from './view/a11y';
@@ -29,8 +29,10 @@ const mount = (extra: Partial<PlinkoOptions> = {}, target: HTMLElement | string 
 const canvasOf = (b: PlinkoBoard) => b.element.querySelector('canvas') as HTMLCanvasElement;
 const liveText = (b: PlinkoBoard) =>
   (b.element.querySelector('[aria-live]')?.textContent ?? '').replace(/​/g, '');
-const press = (b: PlinkoBoard, key: string, init: KeyboardEventInit = {}) => {
-  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
+/** Presses a key on the canvas: a key name, or a full init for modifiers. */
+const press = (b: PlinkoBoard, key: string | KeyboardEventInit): KeyboardEvent => {
+  const init = typeof key === 'string' ? { key } : key;
+  const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
   canvasOf(b).dispatchEvent(event);
   return event;
 };
@@ -113,7 +115,9 @@ describe('mounting', () => {
   });
 
   it('uses custom labels', () => {
-    const b = mount({ labels: { board: 'Preferences', pickedUp: (c) => `Got ${c.label}` } });
+    const b = mount({
+      labels: { board: 'Preferences', pickedUp: ({ chip }) => `Got ${chip.label}` },
+    });
     expect(canvasOf(b).getAttribute('aria-label')).toBe('Preferences');
     press(b, 'Enter');
     expect(liveText(b)).toBe('Got On');
@@ -130,14 +134,15 @@ describe('keyboard', () => {
     expect(liveText(b)).toBe('Off chip.');
 
     expect(press(b, 'Enter').defaultPrevented).toBe(true);
-    expect(onPickUp).toHaveBeenCalledWith(expect.objectContaining({ id: 'off' }));
+    expect(onPickUp).toHaveBeenCalledWith({ chip: expect.objectContaining({ id: 'off' }) });
     expect(b.element.dataset).toMatchObject({ state: 'holding', zone: 'board' });
     expect(liveText(b)).toMatch(/Picked up an Off chip/);
 
     press(b, 'End');
-    press(b, 'ArrowLeft', { shiftKey: true });
+    press(b, { key: 'ArrowLeft', shiftKey: true });
     press(b, 'Enter');
-    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'off' }), {
+    expect(onDrop).toHaveBeenCalledWith({
+      chip: expect.objectContaining({ id: 'off' }),
       dropId: 0,
       dropX: 0.666667, // one slot (of three) left of the right edge, rounded
     });
@@ -157,7 +162,7 @@ describe('keyboard', () => {
     expect(press(b, 'Tab').defaultPrevented).toBe(false);
     press(b, 'Enter');
     expect(press(b, 'Tab').defaultPrevented).toBe(false);
-    expect(press(b, 'Enter', { ctrlKey: true }).defaultPrevented).toBe(false);
+    expect(press(b, { key: 'Enter', ctrlKey: true }).defaultPrevented).toBe(false);
   });
 
   it('honours custom bindings and step sizes', () => {
@@ -168,7 +173,7 @@ describe('keyboard', () => {
     press(b, 'Enter'); // not a drop key any more
     expect(onDrop).not.toHaveBeenCalled();
     press(b, 'd');
-    expect(onDrop).toHaveBeenCalledWith(expect.anything(), { dropId: 0, dropX: 0.51 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ dropId: 0, dropX: 0.51 }));
   });
 });
 
@@ -182,9 +187,9 @@ describe('dropping and settling', () => {
     await expect(settled).resolves.toEqual({ dropId: 0 });
     expect(onLand).toHaveBeenCalledTimes(1);
     expect(onMiss).not.toHaveBeenCalled();
-    const [chip, slot, details] = onLand.mock.calls[0] ?? [];
-    expect(chip.id).toBe('on');
-    expect(['email', 'dark', 'cookies']).toContain(slot.id);
+    const [details] = onLand.mock.calls[0] ?? [];
+    expect(details.chip.id).toBe('on');
+    expect(['email', 'dark', 'cookies']).toContain(details.slot.id);
     expect(details).toMatchObject({ dropId: 0, dropX: 0.5 });
     expect(details.durationMs).toBeGreaterThan(0);
   });

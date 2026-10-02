@@ -25,7 +25,9 @@ const options = resolveCoreOptions({
   board: { rows: Number(args.rows) },
   physics: { seed: Number(args.seed) },
 });
-const world = new World(buildLayout(slotCount, options.board), options.physics, {
+const world = new World({
+  layout: buildLayout(slotCount, options.board),
+  physics: options.physics,
   keepLanded: args.pile,
 });
 
@@ -41,7 +43,7 @@ const started = performance.now();
 for (let i = 0; i < drops; i++) {
   xRng = (Math.imul(xRng, 1103515245) + 12345) >>> 0;
   const x = args.x === 'random' ? xRng / 2 ** 32 : Number(args.x);
-  const chip = world.spawn('chip', x);
+  const chip = world.spawn({ kindId: 'chip', x });
   while (world.flying.includes(chip)) world.step();
   if (chip.slotIndex === undefined) missed++;
   else counts[chip.slotIndex]++;

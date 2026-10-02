@@ -48,36 +48,103 @@ const SPAWN_Y = 0.5;
  */
 const WALL_BUMP_RADIUS = 0.5;
 
-export function buildLayout(slotCount: number, board: ResolvedBoard): Layout {
-  const { rows, pegRadius, chipRadius, slotHeight, railWidth } = board;
-  const width = slotCount;
+/** Pegs and wall bumps, row by row. */
+interface PegField {
+  pegs: Circle[];
+  wallBumps: Circle[];
+  pegRows: number[];
+}
 
-  // Rows alternate between pegs at slot centers (x.5) and pegs on slot boundaries (integers).
-  // The last row sits on the boundaries, directly above the rails.
-  // A peg too close to a wall for a chip to pass would trap chips, so it becomes a bump set into
-  // the wall instead. Bumps keep chips from sliding straight down the walls.
-  const fitsByWall = (x: number) => Math.min(x, slotCount - x) - pegRadius >= 2 * chipRadius;
-  const pegs: Circle[] = [];
-  const wallBumps: Circle[] = [];
-  const pegRows: number[] = [];
+/** Walls, floor, and rails below the pegs. */
+interface Frame {
+  boxes: Box[];
+  railCaps: Circle[];
+  railTopY: number;
+  floorY: number;
+}
+
+interface BoardShape {
+  slotCount: number;
+  board: ResolvedBoard;
+}
+
+interface RowSpec extends BoardShape {
+  y: number;
+  /** x of the first peg: slot boundaries (1) or slot centres (0.5). */
+  startX: number;
+}
+
+interface PegSite extends BoardShape {
+  x: number;
+  y: number;
+}
+
+interface FrameSpec extends BoardShape {
+  lastRowY: number;
+}
+
+export function buildLayout(slotCount: number, board: ResolvedBoard): Layout {
+  const { chipRadius, pegRadius } = board;
+  const field = buildPegField({ slotCount, board });
+  const frame = buildFrame({ slotCount, board, lastRowY: field.pegRows.at(-1) ?? FIRST_ROW_Y });
+  const margin = chipRadius + 0.01;
+  return {
+    slotCount,
+    width: slotCount,
+    height: frame.floorY + 1,
+    chipRadius,
+    pegRadius,
+    ...field,
+    ...frame,
+    spawnY: SPAWN_Y,
+    dropMinX: margin,
+    dropMaxX: slotCount - margin,
+  };
+}
+
+/**
+ * Rows alternate between pegs at slot centres (x.5) and pegs on slot boundaries (integers). The
+ * last row sits on the boundaries, directly above the rails.
+ */
+function buildPegField(shape: BoardShape): PegField {
+  const { rows } = shape.board;
+  const field: PegField = { pegs: [], wallBumps: [], pegRows: [] };
   for (let i = 0; i < rows; i++) {
     const y = FIRST_ROW_Y + i * ROW_SPACING;
-    pegRows.push(y);
+    field.pegRows.push(y);
     const onBoundaries = (rows - 1 - i) % 2 === 0;
-    for (let x = onBoundaries ? 1 : 0.5; x < slotCount; x++) {
-      if (fitsByWall(x)) pegs.push({ x, y, r: pegRadius });
-      // A one-slot board has no room for a bump; that row is left empty.
-      else if (slotCount > 1) {
-        wallBumps.push({ x: x < slotCount / 2 ? 0 : slotCount, y, r: WALL_BUMP_RADIUS });
-      }
-    }
+    addRow(field, { ...shape, y, startX: onBoundaries ? 1 : 0.5 });
   }
+  return field;
+}
 
-  const lastRowY = pegRows[pegRows.length - 1] ?? FIRST_ROW_Y;
+function addRow(field: PegField, row: RowSpec): void {
+  for (let x = row.startX; x < row.slotCount; x++) placePeg(field, { ...row, x });
+}
+
+/**
+ * A peg too close to a wall for a chip to pass would trap chips, so it becomes a bump set into
+ * the wall instead. Bumps also keep chips from sliding straight down the walls.
+ */
+function placePeg(field: PegField, site: PegSite): void {
+  const { x, y, slotCount, board } = site;
+  if (fitsByWall(site)) {
+    field.pegs.push({ x, y, r: board.pegRadius });
+    return;
+  }
+  if (slotCount <= 1) return; // a one-slot board has no room for a bump; the row stays empty
+  field.wallBumps.push({ x: x < slotCount / 2 ? 0 : slotCount, y, r: WALL_BUMP_RADIUS });
+}
+
+function fitsByWall({ x, slotCount, board }: PegSite): boolean {
+  return Math.min(x, slotCount - x) - board.pegRadius >= 2 * board.chipRadius;
+}
+
+function buildFrame({ slotCount, board, lastRowY }: FrameSpec): Frame {
+  const width = slotCount;
   const railTopY = lastRowY + ROW_SPACING;
-  const floorY = railTopY + slotHeight;
+  const floorY = railTopY + board.slotHeight;
   const top = SPAWN_Y - 2;
-
   const boxes: Box[] = [
     { x: -0.5, y: (top + floorY + 1) / 2, w: 1, h: floorY + 1 - top }, // left wall
     { x: width + 0.5, y: (top + floorY + 1) / 2, w: 1, h: floorY + 1 - top }, // right wall
@@ -85,28 +152,10 @@ export function buildLayout(slotCount: number, board: ResolvedBoard): Layout {
   ];
   const railCaps: Circle[] = [];
   for (let x = 1; x < slotCount; x++) {
-    boxes.push({ x, y: (railTopY + floorY) / 2, w: railWidth, h: floorY - railTopY });
-    railCaps.push({ x, y: railTopY, r: railWidth / 2 });
+    boxes.push({ x, y: (railTopY + floorY) / 2, w: board.railWidth, h: floorY - railTopY });
+    railCaps.push({ x, y: railTopY, r: board.railWidth / 2 });
   }
-
-  const margin = chipRadius + 0.01;
-  return {
-    slotCount,
-    width,
-    height: floorY + 1,
-    chipRadius,
-    pegRadius,
-    pegs,
-    railCaps,
-    wallBumps,
-    boxes,
-    pegRows,
-    spawnY: SPAWN_Y,
-    dropMinX: margin,
-    dropMaxX: width - margin,
-    railTopY,
-    floorY,
-  };
+  return { boxes, railCaps, railTopY, floorY };
 }
 
 /** Maps a drop position in [0, 1] to board x. */

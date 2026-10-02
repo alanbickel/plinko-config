@@ -1,7 +1,7 @@
 // Draws the whole interactive board, tray included, on one canvas. Units are board units
 // (see core/types.ts); the view maps them to device pixels.
 
-import { dropXToBoard, type Layout } from '../../core/layout';
+import { type Circle, dropXToBoard, type Layout } from '../../core/layout';
 import type { ChipKindConfig, SlotConfig } from '../../core/types';
 import type { ChipBody } from '../../core/world';
 import type { Zone } from '../input/keyboard';
@@ -14,14 +14,21 @@ const FLOOR = 0.15;
 const LABEL_H = 0.7; // slot label strip
 const TRAY_H = 1.7;
 const TRAY_CHIP_R = 0.32;
-const PEG_FLASH_MS = 120;
+const FONT = '0.26px system-ui, sans-serif';
+const BANNER_FONT = '600 0.34px system-ui, sans-serif';
+/** How long a peg stays lit after a hit. */
+export const PEG_FLASH_MS = 120;
+
+export interface HeldChip {
+  kindId: string;
+  /** Aim, 0..1 across the top of the board. */
+  x: number;
+}
 
 export interface FrameState {
   flying: readonly ChipBody[];
   settled: readonly ChipBody[];
-  /** Held chip's aim, 0..1, or undefined when nothing is held. */
-  heldX: number | undefined;
-  heldKindId: string | undefined;
+  held: HeldChip | undefined;
   selected: number;
   zone: Zone;
   focused: boolean;
@@ -35,183 +42,267 @@ export interface FrameState {
   now: number;
 }
 
+export interface CanvasViewInput {
+  canvas: HTMLCanvasElement;
+  layout: Layout;
+  kinds: readonly ChipKindConfig<unknown>[];
+  slots: readonly SlotConfig<unknown>[];
+  theme: Theme;
+  reducedMotion: boolean;
+}
+
+/** The drawn area, in board units. */
+interface Viewport {
+  x0: number;
+  y0: number;
+  w: number;
+  h: number;
+  trayY: number;
+}
+
+interface PainterInput extends CanvasViewInput {
+  g: CanvasRenderingContext2D;
+  viewport: Viewport;
+}
+
+interface Stroke {
+  color: string;
+  width: number;
+}
+
+function computeViewport(layout: Layout): Viewport {
+  const y0 = layout.spawnY - TOP;
+  const trayY = layout.floorY + FLOOR + LABEL_H;
+  return { x0: -SIDE, y0, w: layout.width + 2 * SIDE, h: trayY + TRAY_H - y0, trayY };
+}
+
 export class CanvasView {
-  private readonly ctx: CanvasRenderingContext2D | null;
-  private readonly x0: number;
-  private readonly y0: number;
-  private readonly w: number;
-  private readonly h: number;
-  private readonly trayY: number;
-  private readonly kindColor = new Map<string, string>();
-  private scale = 1;
+  private readonly viewport: Viewport;
+  /** Absent when there's no 2D context (e.g. jsdom); the view then just doesn't draw. */
+  private readonly painter: Painter | undefined;
 
-  constructor(
-    private readonly canvas: HTMLCanvasElement,
-    private readonly layout: Layout,
-    private readonly kinds: readonly ChipKindConfig<unknown>[],
-    private readonly slots: readonly SlotConfig<unknown>[],
-    private theme: Theme,
-    private readonly reducedMotion: boolean,
-  ) {
-    this.ctx = canvas.getContext('2d');
-    this.x0 = -SIDE;
-    this.w = layout.width + 2 * SIDE;
-    this.y0 = layout.spawnY - TOP;
-    this.trayY = layout.floorY + FLOOR + LABEL_H;
-    this.h = this.trayY + TRAY_H - this.y0;
-    this.setTheme(theme);
-  }
-
-  setTheme(theme: Theme): void {
-    this.theme = theme;
-    for (const k of this.kinds) this.kindColor.set(k.id, k.color ?? theme.chip);
+  constructor(private readonly input: CanvasViewInput) {
+    this.viewport = computeViewport(input.layout);
+    const g = input.canvas.getContext('2d');
+    this.painter = g ? new Painter({ ...input, g, viewport: this.viewport }) : undefined;
   }
 
   /** Width ÷ height of everything drawn, tray included. */
   get aspect(): number {
-    return this.w / this.h;
+    return this.viewport.w / this.viewport.h;
   }
 
   /** Sizes the backing store for a CSS width; returns the CSS height to use. */
   resize(cssWidth: number, dpr: number): number {
-    const cssHeight = (cssWidth * this.h) / this.w;
-    this.canvas.width = Math.max(1, Math.round(cssWidth * dpr));
-    this.canvas.height = Math.max(1, Math.round(cssHeight * dpr));
-    this.scale = this.canvas.width / this.w;
+    const { canvas } = this.input;
+    const cssHeight = (cssWidth * this.viewport.h) / this.viewport.w;
+    canvas.width = Math.max(1, Math.round(cssWidth * dpr));
+    canvas.height = Math.max(1, Math.round(cssHeight * dpr));
+    this.painter?.setScale(canvas.width / this.viewport.w);
     return cssHeight;
   }
 
-  render(f: FrameState): void {
-    const { ctx, layout, theme } = this;
-    if (!ctx) return;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = theme.background;
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  render(frame: FrameState): void {
+    this.painter?.paint(frame);
+  }
+}
+
+class Painter {
+  private readonly kindColor = new Map<string, string>();
+  private scale = 1;
+
+  constructor(private readonly input: PainterInput) {
+    for (const k of input.kinds) this.kindColor.set(k.id, k.color ?? input.theme.chip);
+  }
+
+  setScale(scale: number): void {
+    this.scale = scale;
+  }
+
+  paint(frame: FrameState): void {
+    this.clear();
+    this.drawFrame();
+    this.drawRails();
+    this.drawPegs(frame);
+    this.drawChips(frame);
+    this.drawHeld(frame);
+    this.drawSlotLabels();
+    this.drawTray(frame);
+    if (frame.lockedMessage) this.drawBanner(frame.lockedMessage);
+  }
+
+  private clear(): void {
+    const { g, canvas, theme, viewport } = this.input;
     const s = this.scale;
-    ctx.setTransform(s, 0, 0, s, -this.x0 * s, -this.y0 * s);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = theme.background;
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.setTransform(s, 0, 0, s, -viewport.x0 * s, -viewport.y0 * s);
+  }
 
-    // Frame: walls and floor (drawn thin; bumps and rails on top).
-    ctx.fillStyle = theme.wall;
+  /** Walls and floor, drawn thinner than the physics walls; bumps on top. */
+  private drawFrame(): void {
+    const { g, layout, theme } = this.input;
     const top = layout.spawnY - 0.2;
-    ctx.fillRect(-WALL, top, WALL, layout.floorY - top);
-    ctx.fillRect(layout.width, top, WALL, layout.floorY - top);
-    ctx.fillRect(-WALL, layout.floorY, layout.width + 2 * WALL, FLOOR);
-    for (const b of layout.wallBumps) this.circle(b.x, b.y, b.r, theme.wall);
-
-    ctx.fillStyle = theme.rail;
-    for (const c of layout.railCaps) {
-      ctx.fillRect(c.x - c.r, layout.railTopY, 2 * c.r, layout.floorY - layout.railTopY);
-      this.circle(c.x, c.y, c.r, theme.rail);
-    }
-
-    layout.pegs.forEach((p, i) => {
-      const hit = !this.reducedMotion && f.now - (f.pegHits.get(i) ?? -Infinity) < PEG_FLASH_MS;
-      this.circle(p.x, p.y, p.r, hit ? theme.pegHit : theme.peg);
-    });
-
-    const r = layout.chipRadius;
-    for (const c of f.settled) this.chip(c.pos.x, c.pos.y, r, c.kindId);
-    for (const c of f.flying) {
-      const x = c.prevPos.x + (c.pos.x - c.prevPos.x) * f.alpha;
-      const y = c.prevPos.y + (c.pos.y - c.prevPos.y) * f.alpha;
-      this.chip(x, y, r, c.kindId);
-    }
-
-    if (f.heldX !== undefined && f.heldKindId !== undefined) {
-      const x = dropXToBoard(layout, f.heldX);
-      this.chip(x, layout.spawnY, r, f.heldKindId);
-      if (f.focused && f.zone === 'board') this.focusRing(x, layout.spawnY, r);
-    }
-
-    this.slotLabels();
-    this.tray(f);
-    if (f.lockedMessage) this.banner(f.lockedMessage);
+    g.fillStyle = theme.wall;
+    g.fillRect(-WALL, top, WALL, layout.floorY - top);
+    g.fillRect(layout.width, top, WALL, layout.floorY - top);
+    g.fillRect(-WALL, layout.floorY, layout.width + 2 * WALL, FLOOR);
+    for (const bump of layout.wallBumps) this.circle(bump, theme.wall);
   }
 
-  private slotLabels(): void {
-    const { ctx, theme, layout } = this;
-    if (!ctx) return;
-    ctx.fillStyle = theme.text;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '0.26px system-ui, sans-serif';
+  private drawRails(): void {
+    const { g, layout, theme } = this.input;
+    for (const cap of layout.railCaps) {
+      g.fillStyle = theme.rail;
+      g.fillRect(cap.x - cap.r, layout.railTopY, 2 * cap.r, layout.floorY - layout.railTopY);
+      this.circle(cap, theme.rail);
+    }
+  }
+
+  private drawPegs(frame: FrameState): void {
+    const { layout, theme, reducedMotion } = this.input;
+    layout.pegs.forEach((peg, i) => {
+      const lit = !reducedMotion && frame.now - (frame.pegHits.get(i) ?? -Infinity) < PEG_FLASH_MS;
+      this.circle(peg, lit ? theme.pegHit : theme.peg);
+    });
+  }
+
+  private drawChips(frame: FrameState): void {
+    const r = this.input.layout.chipRadius;
+    for (const c of frame.settled) this.chip({ ...c.pos, r }, c.kindId);
+    for (const c of frame.flying) this.chip({ ...interpolate(c, frame.alpha), r }, c.kindId);
+  }
+
+  private drawHeld(frame: FrameState): void {
+    const { layout } = this.input;
+    if (!frame.held) return;
+    const at: Circle = {
+      x: dropXToBoard(layout, frame.held.x),
+      y: layout.spawnY,
+      r: layout.chipRadius,
+    };
+    this.chip(at, frame.held.kindId);
+    if (frame.focused && frame.zone === 'board') this.ring(grow(at, 0.1), this.focusStroke());
+  }
+
+  private drawSlotLabels(): void {
+    const { g, layout, slots, theme } = this.input;
     const y = layout.floorY + FLOOR + LABEL_H / 2;
-    this.slots.forEach((slot, i) => {
-      ctx.fillText(this.fit(slot.label, 0.95), i + 0.5, y);
+    this.textStyle(FONT, theme.text);
+    slots.forEach((slot, i) => {
+      g.fillText(this.fit(slot.label, 0.95), i + 0.5, y);
     });
   }
 
-  private tray(f: FrameState): void {
-    const { ctx, theme, layout } = this;
-    if (!ctx) return;
-    ctx.fillStyle = theme.tray;
-    ctx.fillRect(this.x0, this.trayY, this.w, TRAY_H);
-    const cell = layout.width / this.kinds.length;
-    const cy = this.trayY + 0.65;
-    this.kinds.forEach((kind, i) => {
-      const cx = cell * (i + 0.5);
-      this.chip(cx, cy, TRAY_CHIP_R, kind.id);
-      if (i === f.selected) {
-        if (f.focused && f.zone === 'tray') this.focusRing(cx, cy, TRAY_CHIP_R);
-        else this.ring(cx, cy, TRAY_CHIP_R + 0.08, theme.mutedText, 0.03);
-      }
-      const count = f.counts[i];
-      ctx.fillStyle = i === f.selected ? theme.text : theme.mutedText;
-      ctx.font = '0.26px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const label = `${kind.label} ×${count === undefined ? '∞' : count}`;
-      ctx.fillText(this.fit(label, cell * 0.95), cx, cy + 0.65);
+  private drawTray(frame: FrameState): void {
+    const { g, kinds, theme, viewport } = this.input;
+    g.fillStyle = theme.tray;
+    g.fillRect(viewport.x0, viewport.trayY, viewport.w, TRAY_H);
+    kinds.forEach((kind, i) => {
+      this.drawTrayChip({ kind, index: i, frame });
     });
   }
 
-  private banner(message: string): void {
-    const { ctx, theme, layout } = this;
-    if (!ctx) return;
+  private drawTrayChip({ kind, index, frame }: TrayChipInput): void {
+    const { g, layout, kinds, theme } = this.input;
+    const cell = layout.width / kinds.length;
+    const at: Circle = {
+      x: cell * (index + 0.5),
+      y: this.input.viewport.trayY + 0.65,
+      r: TRAY_CHIP_R,
+    };
+    const selected = index === frame.selected;
+    this.chip(at, kind.id);
+    if (selected) this.drawSelection({ at, frame });
+    const count = frame.counts[index];
+    this.textStyle(FONT, selected ? theme.text : theme.mutedText);
+    g.fillText(this.fit(`${kind.label} ×${count ?? '∞'}`, cell * 0.95), at.x, at.y + 0.65);
+  }
+
+  /** The selected tray kind: a focus ring while the tray has focus, a quiet ring otherwise. */
+  private drawSelection({ at, frame }: SelectionInput): void {
+    const trayFocused = frame.focused && frame.zone === 'tray';
+    const muted: Stroke = { color: this.input.theme.mutedText, width: 0.03 };
+    this.ring(grow(at, trayFocused ? 0.1 : 0.08), trayFocused ? this.focusStroke() : muted);
+  }
+
+  private drawBanner(message: string): void {
+    const { g, layout, theme, viewport } = this.input;
     const y = (layout.spawnY + layout.railTopY) / 2;
-    ctx.fillStyle = theme.overlay;
-    ctx.fillRect(this.x0, y - 0.7, this.w, 1.4);
-    ctx.fillStyle = theme.text;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '600 0.34px system-ui, sans-serif';
-    ctx.fillText(this.fit(message, this.w - 0.4), layout.width / 2, y);
+    g.fillStyle = theme.overlay;
+    g.fillRect(viewport.x0, y - 0.7, viewport.w, 1.4);
+    this.textStyle(BANNER_FONT, theme.text);
+    g.fillText(this.fit(message, viewport.w - 0.4), layout.width / 2, y);
+  }
+
+  private textStyle(font: string, color: string): void {
+    const { g } = this.input;
+    g.font = font;
+    g.fillStyle = color;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
   }
 
   /** Shortens text with an ellipsis to fit maxWidth (board units) in the current font. */
   private fit(text: string, maxWidth: number): string {
-    const { ctx } = this;
-    if (!ctx || ctx.measureText(text).width <= maxWidth) return text;
+    const { g } = this.input;
+    if (g.measureText(text).width <= maxWidth) return text;
     let t = text;
-    while (t.length > 1 && ctx.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
+    while (t.length > 1 && g.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
     return `${t}…`;
   }
 
-  private chip(x: number, y: number, r: number, kindId: string): void {
-    this.circle(x, y, r, this.kindColor.get(kindId) ?? this.theme.chip);
-    this.ring(x, y, r, this.theme.chipStroke, 0.03);
+  private focusStroke(): Stroke {
+    return { color: this.input.theme.focus, width: 0.06 };
   }
 
-  private focusRing(x: number, y: number, r: number): void {
-    this.ring(x, y, r + 0.1, this.theme.focus, 0.06);
+  private chip(at: Circle, kindId: string): void {
+    const { theme } = this.input;
+    this.circle(at, this.kindColor.get(kindId) ?? theme.chip);
+    this.ring(at, { color: theme.chipStroke, width: 0.03 });
   }
 
-  private circle(x: number, y: number, r: number, color: string): void {
-    const { ctx } = this;
-    if (!ctx) return;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
+  private circle({ x, y, r }: Circle, color: string): void {
+    const { g } = this.input;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fillStyle = color;
+    g.fill();
   }
 
-  private ring(x: number, y: number, r: number, color: string, width: number): void {
-    const { ctx } = this;
-    if (!ctx) return;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    ctx.stroke();
+  private ring({ x, y, r }: Circle, stroke: Stroke): void {
+    const { g } = this.input;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.strokeStyle = stroke.color;
+    g.lineWidth = stroke.width;
+    g.stroke();
   }
 }
+
+interface TrayChipInput {
+  kind: ChipKindConfig<unknown>;
+  index: number;
+  frame: FrameState;
+}
+
+interface SelectionInput {
+  at: Circle;
+  frame: FrameState;
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+/** Where a flying chip is drawn: alpha of the way from its previous step to its latest. */
+function interpolate(chip: ChipBody, alpha: number): Point {
+  return {
+    x: chip.prevPos.x + (chip.pos.x - chip.prevPos.x) * alpha,
+    y: chip.prevPos.y + (chip.pos.y - chip.prevPos.y) * alpha,
+  };
+}
+
+const grow = (c: Circle, by: number): Circle => ({ ...c, r: c.r + by });

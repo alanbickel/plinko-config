@@ -1,8 +1,9 @@
 // Physics debug page: tune the core simulation by eye. Not part of the package.
-import { buildLayout, dropXToBoard, type Layout } from '../src/core/layout';
+import { buildLayout, type Circle, dropXToBoard, type Layout } from '../src/core/layout';
 import { DEFAULT_BOARD, DEFAULT_PHYSICS, resolveCoreOptions } from '../src/core/options';
 import type { ResolvedBoard, ResolvedPhysics } from '../src/core/types';
-import { STEP, World, type WorldEvent } from '../src/core/world';
+import { STEP, World, type WorldEventByType } from '../src/core/world';
+import { dispatchByType, type HandlerMap } from '../src/runtime/dispatch';
 
 const COLORS = {
   bg: '#11151c',
@@ -23,7 +24,7 @@ const MAX_STEPS_PER_FRAME = 40;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('board');
-const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+const g = canvas.getContext('2d') as CanvasRenderingContext2D;
 
 // ---- Settings -------------------------------------------------------------
 
@@ -31,12 +32,29 @@ const physics: ResolvedPhysics = { ...DEFAULT_PHYSICS, seed: 1, bias: [] };
 const board: ResolvedBoard = { ...DEFAULT_BOARD };
 const sim = { slots: 7, piles: true, speed: 1, seed: 1 };
 
-interface Slider<K extends string> {
-  key: K;
+interface SliderSpec {
   label: string;
   min: number;
   max: number;
   step: number;
+}
+
+interface Slider<K extends string> extends SliderSpec {
+  key: K;
+}
+
+interface SliderInput {
+  parent: HTMLElement;
+  spec: SliderSpec;
+  value: number;
+  onInput: (value: number) => void;
+}
+
+interface CheckInput {
+  parent: HTMLElement;
+  text: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
 }
 
 const physicsSliders: Slider<'gravity' | 'restitution' | 'friction' | 'jitter' | 'maxSpeed'>[] = [
@@ -53,18 +71,13 @@ const boardSliders: Slider<'rows' | 'chipRadius' | 'pegRadius' | 'slotHeight'>[]
   { key: 'slotHeight', label: 'Slot height', min: 0.8, max: 5, step: 0.1 },
 ];
 
-function addSlider(
-  parent: HTMLElement,
-  s: { label: string; min: number; max: number; step: number },
-  value: number,
-  onInput: (v: number) => void,
-) {
+function addSlider({ parent, spec, value, onInput }: SliderInput): void {
   const label = document.createElement('label');
   const input = Object.assign(document.createElement('input'), {
     type: 'range',
-    min: String(s.min),
-    max: String(s.max),
-    step: String(s.step),
+    min: String(spec.min),
+    max: String(spec.max),
+    step: String(spec.step),
     value: String(value),
   });
   const out = document.createElement('output');
@@ -73,16 +86,11 @@ function addSlider(
     out.value = input.value;
     onInput(Number(input.value));
   });
-  label.append(s.label, input, out);
+  label.append(spec.label, input, out);
   parent.append(label);
 }
 
-function addCheck(
-  parent: HTMLElement,
-  text: string,
-  checked: boolean,
-  onChange: (v: boolean) => void,
-) {
+function addCheck({ parent, text, checked, onChange }: CheckInput): void {
   const label = Object.assign(document.createElement('label'), { className: 'check' });
   const input = Object.assign(document.createElement('input'), { type: 'checkbox', checked });
   input.addEventListener('change', () => onChange(input.checked));
@@ -90,37 +98,74 @@ function addCheck(
   parent.append(label);
 }
 
-for (const s of physicsSliders) {
+for (const spec of physicsSliders) {
   // Live: the world reads this same object every step.
-  addSlider($('physics'), s, physics[s.key], (v) => {
-    physics[s.key] = v;
+  addSlider({
+    parent: $('physics'),
+    spec,
+    value: physics[spec.key],
+    onInput: (v) => {
+      physics[spec.key] = v;
+    },
   });
 }
-addCheck($('physics'), 'Chip–chip collisions', physics.chipCollisions, (v) => {
-  physics.chipCollisions = v;
+addCheck({
+  parent: $('physics'),
+  text: 'Chip–chip collisions',
+  checked: physics.chipCollisions,
+  onChange: (v) => {
+    physics.chipCollisions = v;
+  },
 });
 
-addSlider($('geometry'), { label: 'Slots', min: 1, max: 15, step: 1 }, sim.slots, (v) => {
-  sim.slots = v;
-  reset();
-});
-for (const s of boardSliders) {
-  addSlider($('geometry'), s, board[s.key], (v) => {
-    board[s.key] = v;
+const resetting =
+  <T>(apply: (value: T) => void) =>
+  (value: T) => {
+    apply(value);
     reset();
+  };
+
+addSlider({
+  parent: $('geometry'),
+  spec: { label: 'Slots', min: 1, max: 15, step: 1 },
+  value: sim.slots,
+  onInput: resetting((v) => {
+    sim.slots = v;
+  }),
+});
+for (const spec of boardSliders) {
+  addSlider({
+    parent: $('geometry'),
+    spec,
+    value: board[spec.key],
+    onInput: resetting((v) => {
+      board[spec.key] = v;
+    }),
   });
 }
-
-addSlider($('sim'), { label: 'Speed', min: 0.05, max: 2, step: 0.05 }, sim.speed, (v) => {
-  sim.speed = v;
+addSlider({
+  parent: $('sim'),
+  spec: { label: 'Speed', min: 0.05, max: 2, step: 0.05 },
+  value: sim.speed,
+  onInput: (v) => {
+    sim.speed = v;
+  },
 });
-addSlider($('sim'), { label: 'Seed', min: 1, max: 100, step: 1 }, sim.seed, (v) => {
-  sim.seed = v;
-  reset();
+addSlider({
+  parent: $('sim'),
+  spec: { label: 'Seed', min: 1, max: 100, step: 1 },
+  value: sim.seed,
+  onInput: resetting((v) => {
+    sim.seed = v;
+  }),
 });
-addCheck($('sim'), 'Keep landed chips (piles)', sim.piles, (v) => {
-  sim.piles = v;
-  reset();
+addCheck({
+  parent: $('sim'),
+  text: 'Keep landed chips (piles)',
+  checked: sim.piles,
+  onChange: resetting((v) => {
+    sim.piles = v;
+  }),
 });
 
 // ---- World ----------------------------------------------------------------
@@ -133,18 +178,24 @@ let fallTimes: number[] = [];
 let fullNote = '';
 const pegFlash = new Map<number, number>();
 
-function reset() {
+const eventHandlers: HandlerMap<WorldEventByType> = {
+  pegHit: (e) => pegFlash.set(e.pegIndex, performance.now()),
+  landed: (e) => {
+    counts[e.slotIndex] = (counts[e.slotIndex] ?? 0) + 1;
+    fallTimes.push(e.chip.ageSteps * STEP);
+  },
+  missed: () => {
+    missed++;
+  },
+  full: (e) => {
+    fullNote = `FULL (${e.reason}) after ${world.landed.length} chips`;
+  },
+};
+
+function reset(): void {
   try {
-    const opts = resolveCoreOptions({
-      slots: Array.from({ length: sim.slots }, (_, i) => ({ id: `s${i}`, label: `${i}` })),
-      chips: [{ id: 'chip', label: 'Chip' }],
-      board,
-      physics: { ...physics, bias: undefined, seed: sim.seed },
-    });
+    rebuildWorld();
     $('error').textContent = '';
-    Object.assign(physics, { bias: opts.physics.bias, seed: sim.seed });
-    layout = buildLayout(sim.slots, opts.board);
-    world = new World(layout, physics, { keepLanded: sim.piles });
   } catch (err) {
     // Keep the previous board; show why the new settings were rejected.
     $('error').textContent = err instanceof Error ? err.message : String(err);
@@ -158,18 +209,19 @@ function reset() {
   resize();
 }
 
-function handle(events: WorldEvent[]) {
-  for (const e of events) {
-    if (e.type === 'pegHit') pegFlash.set(e.pegIndex, performance.now());
-    else if (e.type === 'landed') {
-      counts[e.slotIndex] = (counts[e.slotIndex] ?? 0) + 1;
-      fallTimes.push(e.chip.ageSteps * STEP);
-    } else if (e.type === 'missed') missed++;
-    else if (e.type === 'full') fullNote = `FULL (${e.reason}) after ${world.landed.length} chips`;
-  }
+function rebuildWorld(): void {
+  const opts = resolveCoreOptions({
+    slots: Array.from({ length: sim.slots }, (_, i) => ({ id: `s${i}`, label: `${i}` })),
+    chips: [{ id: 'chip', label: 'Chip' }],
+    board,
+    physics: { ...physics, bias: undefined, seed: sim.seed },
+  });
+  Object.assign(physics, { bias: opts.physics.bias, seed: sim.seed });
+  layout = buildLayout(sim.slots, opts.board);
+  world = new World({ layout, physics, keepLanded: sim.piles });
 }
 
-const drop = (x01: number) => world.spawn('chip', Math.min(1, Math.max(0, x01)));
+const drop = (x01: number) => world.spawn({ kindId: 'chip', x: Math.min(1, Math.max(0, x01)) });
 
 // ---- Input ----------------------------------------------------------------
 
@@ -211,7 +263,7 @@ const view = { x0: -1, y0: -1.5, w: 0, h: 0 };
 const stage = $('stage');
 
 /** Fits the whole board into the stage's width and the window's remaining height. */
-function resize() {
+function resize(): void {
   view.w = layout.width + 2;
   view.h = layout.height + HIST_HEIGHT - view.y0;
   const maxWidth = stage.clientWidth;
@@ -227,79 +279,104 @@ function resize() {
 new ResizeObserver(() => layout && resize()).observe(stage);
 window.addEventListener('resize', () => layout && resize());
 
-function circle(x: number, y: number, r: number, color: string) {
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
+function circle({ x, y, r }: Circle, color: string): void {
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.fillStyle = color;
+  g.fill();
 }
 
-function draw() {
+function draw(): void {
+  clear();
+  drawGuides();
+  drawStatics();
+  drawPegs();
+  drawChips();
+  drawHover();
+  drawHistogram();
+}
+
+function clear(): void {
   const scale = canvas.width / view.w;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = COLORS.bg;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.setTransform(scale, 0, 0, scale, -view.x0 * scale, -view.y0 * scale);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.fillStyle = COLORS.bg;
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  g.setTransform(scale, 0, 0, scale, -view.x0 * scale, -view.y0 * scale);
+}
 
-  // Guides: drop line and rail tops.
-  ctx.lineWidth = 0.02;
-  ctx.strokeStyle = COLORS.guide;
+/** The drop line and the rail tops. */
+function drawGuides(): void {
+  g.lineWidth = 0.02;
+  g.strokeStyle = COLORS.guide;
   for (const y of [layout.spawnY, layout.railTopY]) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(layout.width, y);
-    ctx.stroke();
+    g.beginPath();
+    g.moveTo(0, y);
+    g.lineTo(layout.width, y);
+    g.stroke();
   }
+}
 
-  ctx.fillStyle = COLORS.wall;
+function drawStatics(): void {
   for (const b of layout.boxes) {
     const isRail = b.x > 0 && b.x < layout.width && b.y < layout.floorY;
-    ctx.fillStyle = isRail ? COLORS.rail : COLORS.wall;
-    ctx.fillRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h);
+    g.fillStyle = isRail ? COLORS.rail : COLORS.wall;
+    g.fillRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h);
   }
-  for (const c of layout.railCaps) circle(c.x, c.y, c.r, COLORS.rail);
-  for (const c of layout.wallBumps) circle(c.x, c.y, c.r, COLORS.wall);
+  for (const cap of layout.railCaps) circle(cap, COLORS.rail);
+  for (const bump of layout.wallBumps) circle(bump, COLORS.wall);
+}
 
+function drawPegs(): void {
   const now = performance.now();
-  layout.pegs.forEach((p, i) => {
+  layout.pegs.forEach((peg, i) => {
     const hit = now - (pegFlash.get(i) ?? 0) < PEG_FLASH_MS;
-    circle(p.x, p.y, hit ? p.r * 1.6 : p.r, hit ? COLORS.pegHit : COLORS.peg);
-  });
-
-  const r = layout.chipRadius;
-  for (const c of world.landed) {
-    circle(c.pos.x, c.pos.y, r, c.outcome === 'landed' ? COLORS.landed : COLORS.missed);
-  }
-  for (const c of world.flying) circle(c.pos.x, c.pos.y, r, COLORS.flying);
-
-  if (hoverX !== null && hoverX >= 0 && hoverX <= 1) {
-    ctx.globalAlpha = 0.35;
-    circle(dropXToBoard(layout, hoverX), layout.spawnY, r, COLORS.flying);
-    ctx.globalAlpha = 1;
-  }
-
-  // Histogram of valid landings, under each slot.
-  const max = Math.max(1, ...counts);
-  const base = layout.height + HIST_HEIGHT - 0.4;
-  ctx.font = '0.35px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  counts.forEach((n, i) => {
-    const h = ((HIST_HEIGHT - 0.9) * n) / max;
-    ctx.fillStyle = COLORS.bar;
-    ctx.fillRect(i + 0.15, base - h, 0.7, h);
-    ctx.fillStyle = COLORS.text;
-    ctx.fillText(String(n), i + 0.5, base + 0.35);
+    circle({ ...peg, r: hit ? peg.r * 1.6 : peg.r }, hit ? COLORS.pegHit : COLORS.peg);
   });
 }
 
-function stats() {
+function drawChips(): void {
+  const r = layout.chipRadius;
+  for (const c of world.landed) {
+    circle({ ...c.pos, r }, c.outcome === 'landed' ? COLORS.landed : COLORS.missed);
+  }
+  for (const c of world.flying) circle({ ...c.pos, r }, COLORS.flying);
+}
+
+/** Ghost chip where a click would drop. */
+function drawHover(): void {
+  if (hoverX === null || hoverX < 0 || hoverX > 1) return;
+  g.globalAlpha = 0.35;
+  circle(
+    { x: dropXToBoard(layout, hoverX), y: layout.spawnY, r: layout.chipRadius },
+    COLORS.flying,
+  );
+  g.globalAlpha = 1;
+}
+
+/** Valid landings per slot, under each slot. */
+function drawHistogram(): void {
+  const max = Math.max(1, ...counts);
+  const base = layout.height + HIST_HEIGHT - 0.4;
+  g.font = '0.35px system-ui, sans-serif';
+  g.textAlign = 'center';
+  counts.forEach((n, i) => {
+    const h = ((HIST_HEIGHT - 0.9) * n) / max;
+    g.fillStyle = COLORS.bar;
+    g.fillRect(i + 0.15, base - h, 0.7, h);
+    g.fillStyle = COLORS.text;
+    g.fillText(String(n), i + 0.5, base + 0.35);
+  });
+}
+
+function stats(): void {
   const landed = counts.reduce((a, b) => a + b, 0);
   const sorted = [...fallTimes].sort((a, b) => a - b);
   const p = (q: number) => (sorted[Math.floor((sorted.length - 1) * q)] ?? 0).toFixed(2);
   const total = landed + missed;
+  const missedShare = total ? ` (${((missed / total) * 100).toFixed(0)}%)` : '';
   $('stats').textContent = [
     `in flight ${world.flying.length}`,
-    `landed ${landed} · missed ${missed}${total ? ` (${((missed / total) * 100).toFixed(0)}%)` : ''}`,
+    `landed ${landed} · missed ${missed}${missedShare}`,
     `fall p50 ${p(0.5)}s · p95 ${p(0.95)}s`,
     fullNote,
   ]
@@ -312,12 +389,13 @@ function stats() {
 let last = performance.now();
 let acc = 0;
 let statsAt = 0;
-function frame(now: number) {
+
+function frame(now: number): void {
   acc += (Math.min(now - last, 100) / 1000) * sim.speed;
   last = now;
   let steps = 0;
   while (acc >= STEP && steps < MAX_STEPS_PER_FRAME) {
-    handle(world.step());
+    for (const e of world.step()) dispatchByType(eventHandlers, e);
     acc -= STEP;
     steps++;
   }

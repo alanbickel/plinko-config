@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { interpretKey, type KeyContext, resolveKeys } from './keyboard';
+import {
+  DEFAULT_KEYS,
+  interpretKey,
+  type KeyContext,
+  type KeyInput,
+  resolveKeys,
+} from './keyboard';
 
 const ctx = (extra: Partial<KeyContext> = {}): KeyContext => ({
   zone: 'tray',
@@ -9,9 +15,10 @@ const ctx = (extra: Partial<KeyContext> = {}): KeyContext => ({
   lastKindIndex: undefined,
   aimStep: 0.05,
   aimStepLarge: 0.2,
+  keys: DEFAULT_KEYS,
   ...extra,
 });
-const key = (k: string, shiftKey = false) => ({ key: k, shiftKey });
+const key = (k: string, shiftKey = false): KeyInput => ({ key: k, shiftKey });
 
 describe('interpretKey: tray zone', () => {
   it('cycles the selection with wrap-around', () => {
@@ -81,10 +88,10 @@ describe('interpretKey: board zone, empty-handed', () => {
 describe('custom bindings', () => {
   it('replaces only the actions given', () => {
     const keys = resolveKeys({ drop: ['d'], left: ['a'] });
-    const holding = ctx({ zone: 'board', holding: true });
-    expect(interpretKey(key('d'), holding, keys)).toEqual({ type: 'drop' });
-    expect(interpretKey(key('Enter'), holding, keys)).toBeNull();
-    expect(interpretKey(key('a'), holding, keys)).toEqual({ type: 'nudge', dx: -0.05 });
-    expect(interpretKey(key('ArrowRight'), holding, keys)).toEqual({ type: 'nudge', dx: 0.05 });
+    const holding = ctx({ zone: 'board', holding: true, keys });
+    expect(interpretKey(key('d'), holding)).toEqual({ type: 'drop' });
+    expect(interpretKey(key('Enter'), holding)).toBeNull();
+    expect(interpretKey(key('a'), holding)).toEqual({ type: 'nudge', dx: -0.05 });
+    expect(interpretKey(key('ArrowRight'), holding)).toEqual({ type: 'nudge', dx: 0.05 });
   });
 });

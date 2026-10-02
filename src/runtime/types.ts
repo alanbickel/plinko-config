@@ -3,20 +3,26 @@ import type { KeyBindings } from './input/keyboard';
 import type { Labels } from './labels';
 import type { Theme } from './theme';
 
-export interface DropDetails {
+// Callbacks take one object each, so new fields never break existing hosts.
+
+export interface PickUpDetails<CV = unknown> {
+  chip: ChipKindConfig<CV>;
+}
+
+export interface DropDetails<CV = unknown> extends PickUpDetails<CV> {
   /** Correlates onDrop, onPegHit, onLand / onMiss, and the drop() promise. */
   dropId: number;
   /** 0..1 across the top of the board. */
   dropX: number;
 }
 
-export interface PegHitDetails extends DropDetails {
+export interface PegHitDetails<CV = unknown> extends DropDetails<CV> {
   pegIndex: number;
   /** Impact speed, board units per second. Handy for scaling a sound. */
   speed: number;
 }
 
-export interface SettleDetails extends DropDetails {
+export interface MissDetails<CV = unknown> extends DropDetails<CV> {
   pegHits: number;
   /** Simulated fall time. */
   durationMs: number;
@@ -24,7 +30,15 @@ export interface SettleDetails extends DropDetails {
   seed: number;
 }
 
+export interface LandDetails<CV = unknown, SV = unknown> extends MissDetails<CV> {
+  slot: SlotConfig<SV>;
+}
+
 export type FullReason = 'slots' | 'overflow';
+
+export interface FullDetails {
+  reason: FullReason;
+}
 
 /** What drop() resolves with: only that the chip is no longer in flight. */
 export interface Settled {
@@ -46,15 +60,15 @@ export interface PlinkoOptions<CV = unknown, SV = unknown> extends CoreOptions<C
   /** "Powered by LittleJS" link under the board. Default true. */
   attribution?: boolean;
 
-  onPickUp?: (chip: ChipKindConfig<CV>) => void;
-  onDrop?: (chip: ChipKindConfig<CV>, details: DropDetails) => void;
-  onPegHit?: (chip: ChipKindConfig<CV>, details: PegHitDetails) => void;
+  onPickUp?: (details: PickUpDetails<CV>) => void;
+  onDrop?: (details: DropDetails<CV>) => void;
+  onPegHit?: (details: PegHitDetails<CV>) => void;
   /** The chip came to rest in a slot. The only signal that a preference should change. */
-  onLand?: (chip: ChipKindConfig<CV>, slot: SlotConfig<SV>, details: SettleDetails) => void;
+  onLand?: (details: LandDetails<CV, SV>) => void;
   /** The chip settled without reaching a slot (e.g. on top of an overflowing pile). */
-  onMiss?: (chip: ChipKindConfig<CV>, details: SettleDetails) => void;
+  onMiss?: (details: MissDetails<CV>) => void;
   /** The board is full and locked. Fires once. */
-  onFull?: (details: { reason: FullReason }) => void;
+  onFull?: (details: FullDetails) => void;
 }
 
 export interface DropOptions {
@@ -62,7 +76,7 @@ export interface DropOptions {
   chip?: string;
   /** Where to drop, 0..1. Defaults to the current aim. */
   x?: number;
-  /** Replay a drop exactly (see SettleDetails.seed). */
+  /** Replay a drop exactly (see MissDetails.seed / LandDetails.seed). */
   seed?: number;
 }
 

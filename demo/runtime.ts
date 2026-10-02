@@ -1,6 +1,6 @@
 // Runtime debug page: the real board through the public API only, plus a dev panel.
 // Not part of the package.
-import { createPlinko, type PlinkoBoard } from '../src/index';
+import { createPlinko, type PlinkoBoard, type PlinkoOptions } from '../src/index';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const host = $('host');
@@ -25,65 +25,81 @@ let liveObserver: MutationObserver | undefined;
 let pegHits = 0;
 let selectedKind = 'on';
 
-function list(id: string, text: string, tag?: string) {
-  const ol = $(id);
+interface ListEntry {
+  /** id of the <ol> to append to. */
+  list: string;
+  text: string;
+  /** Highlighted prefix, e.g. the callback name. */
+  tag?: string;
+}
+
+function append({ list, text, tag }: ListEntry): void {
+  const ol = $(list);
   const li = document.createElement('li');
-  if (tag) {
-    const span = Object.assign(document.createElement('span'), {
-      className: 'tag',
-      textContent: tag,
-    });
-    li.append(span, ' ');
-  }
+  if (tag)
+    li.append(
+      Object.assign(document.createElement('span'), { className: 'tag', textContent: tag }),
+      ' ',
+    );
   li.append(text);
   ol.append(li);
   while (ol.children.length > 200) ol.firstElementChild?.remove();
   ol.scrollTop = ol.scrollHeight;
 }
-const log = (name: string, payload: unknown) => list('log', JSON.stringify(payload), name);
+const log = (name: string, payload: unknown) =>
+  append({ list: 'log', text: JSON.stringify(payload), tag: name });
 
-function mount() {
+const input = (id: string) => $<HTMLInputElement>(id);
+const optionalNumber = (id: string) => (input(id).value ? Number(input(id).value) : undefined);
+
+/** Board options from the panel, with every callback logged. */
+function boardOptions(): PlinkoOptions {
+  const slotCount = Math.min(12, Math.max(1, Number(input('slots').value) || 5));
+  return {
+    slots: SLOT_NAMES.slice(0, slotCount).map((label, i) => ({ id: `s${i}`, label })),
+    chips: [
+      { id: 'on', label: 'On', color: '#3ec7a8' },
+      { id: 'off', label: 'Off', color: '#e0607e' },
+    ],
+    physics: { seed: Number(input('seed').value) || 1 },
+    autoReload: input('autoReload').checked,
+    attribution: input('attribution').checked,
+    aimStep: optionalNumber('aimStep'),
+    aimStepLarge: optionalNumber('aimStepLarge'),
+    onPickUp: ({ chip }) => {
+      selectedKind = chip.id;
+      log('onPickUp', chip.id);
+    },
+    onDrop: (d) => log('onDrop', { ...d, chip: d.chip.id }),
+    onPegHit: () => {
+      pegHits++;
+    },
+    onLand: (d) => log('onLand', { ...d, chip: d.chip.id, slot: d.slot.label }),
+    onMiss: (d) => log('onMiss', { ...d, chip: d.chip.id }),
+    onFull: (d) => log('onFull', d),
+  };
+}
+
+function mount(): void {
   board?.destroy();
   pegHits = 0;
-  const slotCount = Math.min(12, Math.max(1, Number($<HTMLInputElement>('slots').value) || 5));
-  const optionalNumber = (id: string) => {
-    const raw = $<HTMLInputElement>(id).value;
-    return raw ? Number(raw) : undefined;
-  };
   try {
-    board = createPlinko(host, {
-      slots: SLOT_NAMES.slice(0, slotCount).map((label, i) => ({ id: `s${i}`, label })),
-      chips: [
-        { id: 'on', label: 'On', color: '#3ec7a8' },
-        { id: 'off', label: 'Off', color: '#e0607e' },
-      ],
-      physics: { seed: Number($<HTMLInputElement>('seed').value) || 1 },
-      autoReload: $<HTMLInputElement>('autoReload').checked,
-      attribution: $<HTMLInputElement>('attribution').checked,
-      aimStep: optionalNumber('aimStep'),
-      aimStepLarge: optionalNumber('aimStepLarge'),
-      onPickUp: (chip) => {
-        selectedKind = chip.id;
-        log('onPickUp', chip.id);
-      },
-      onDrop: (chip, d) => log('onDrop', { chip: chip.id, ...d }),
-      onPegHit: () => {
-        pegHits++;
-      },
-      onLand: (chip, slot, d) => log('onLand', { chip: chip.id, slot: slot.label, ...d }),
-      onMiss: (chip, d) => log('onMiss', { chip: chip.id, ...d }),
-      onFull: (d) => log('onFull', d),
-    });
+    board = createPlinko(host, boardOptions());
   } catch (err) {
     log('error', String(err));
     board = undefined;
     return;
   }
-  const live = board.element.querySelector('[aria-live]');
+  watchAnnouncements(board);
+}
+
+/** Copies everything the live region says into the transcript. */
+function watchAnnouncements(b: PlinkoBoard): void {
+  const live = b.element.querySelector('[aria-live]');
   liveObserver?.disconnect();
   liveObserver = new MutationObserver(() => {
     const text = live?.textContent?.replace(/​/g, '');
-    if (text) list('transcript', text);
+    if (text) append({ list: 'transcript', text });
   });
   if (live) liveObserver.observe(live, { childList: true, characterData: true, subtree: true });
 }

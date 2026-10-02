@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildLayout, type Circle, dropXToBoard, slotIndexAt } from './layout';
+import { buildLayout, type Circle, dropXToBoard, type Layout, slotIndexAt } from './layout';
 import { DEFAULT_BOARD } from './options';
 import type { ResolvedBoard } from './types';
 
@@ -7,6 +7,31 @@ const board = (extra: Partial<ResolvedBoard> = {}): ResolvedBoard => ({
   ...DEFAULT_BOARD,
   ...extra,
 });
+
+/** Horizontal extent of an obstacle in a row. */
+interface Span {
+  left: number;
+  right: number;
+}
+
+const spanOf = (c: Circle): Span => ({ left: c.x - c.r, right: c.x + c.r });
+
+/** Open gaps between neighbouring obstacles (and the wall faces) in the peg row at y. */
+function rowGaps(layout: Layout, y: number): number[] {
+  const row = [...layout.pegs, ...layout.wallBumps].filter((c) => c.y === y);
+  const wallFaces: Span[] = [
+    { left: 0, right: 0 },
+    { left: layout.width, right: layout.width },
+  ];
+  const spans = [...wallFaces, ...row.map(spanOf)].sort((a, b) => a.left - b.left);
+  const gaps: number[] = [];
+  let reach = 0; // rightmost edge so far
+  for (const span of spans) {
+    gaps.push(span.left - reach);
+    reach = Math.max(reach, span.right);
+  }
+  return gaps.filter((gap) => gap > 0);
+}
 
 describe('buildLayout', () => {
   it('builds a triangular lattice with the last row on slot boundaries', () => {
@@ -52,21 +77,8 @@ describe('buildLayout', () => {
   ])('leaves a passable gap between neighbours (%i slots, %o)', (slots, extra) => {
     const b = board(extra);
     const layout = buildLayout(slots, b);
-    const diameter = 2 * b.chipRadius;
-    for (const y of layout.pegRows) {
-      const row: Circle[] = [...layout.pegs, ...layout.wallBumps].filter((c) => c.y === y);
-      const edges = [
-        { left: 0, right: 0 }, // left wall face
-        ...row.map((c) => ({ left: c.x - c.r, right: c.x + c.r })),
-        { left: slots, right: slots }, // right wall face
-      ].sort((a, c) => a.left - c.left);
-      let reach = 0; // rightmost edge so far
-      for (const e of edges) {
-        const gap = e.left - reach;
-        if (gap > 0) expect(gap).toBeGreaterThanOrEqual(diameter);
-        reach = Math.max(reach, e.right);
-      }
-    }
+    const gaps = layout.pegRows.flatMap((y) => rowGaps(layout, y));
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(2 * b.chipRadius);
   });
 
   it('keeps every static within reach of the 1-unit collision grid', () => {

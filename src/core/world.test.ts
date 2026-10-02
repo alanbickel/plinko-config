@@ -2,11 +2,28 @@ import { describe, expect, it } from 'vitest';
 import { buildLayout } from './layout';
 import { resolveCoreOptions } from './options';
 import type { BoardConfig, PhysicsConfig } from './types';
-import { type ChipBody, STEP, World, type WorldEvent, type WorldOptions } from './world';
+import {
+  type ChipBody,
+  type LandedEvent,
+  type MissedEvent,
+  STEP,
+  World,
+  type WorldEvent,
+} from './world';
 
-function makeWorld(
-  opts: { slots?: number; board?: BoardConfig; physics?: PhysicsConfig } & WorldOptions = {},
-) {
+interface MakeWorldInput {
+  slots?: number;
+  board?: BoardConfig;
+  physics?: PhysicsConfig;
+  keepLanded?: boolean;
+}
+
+interface SettledDrop {
+  chip: ChipBody;
+  events: WorldEvent[];
+}
+
+function makeWorld(opts: MakeWorldInput = {}): World {
   const slotCount = opts.slots ?? 7;
   const o = resolveCoreOptions({
     slots: Array.from({ length: slotCount }, (_, i) => ({ id: `s${i}`, label: `Slot ${i}` })),
@@ -14,19 +31,27 @@ function makeWorld(
     board: opts.board,
     physics: { seed: 1, ...opts.physics },
   });
-  return new World(buildLayout(slotCount, o.board), o.physics, { keepLanded: opts.keepLanded });
+  return new World({
+    layout: buildLayout(slotCount, o.board),
+    physics: o.physics,
+    keepLanded: opts.keepLanded,
+  });
 }
 
-/** Drops one chip and runs until it settles. */
-function dropOne(world: World, x: number, seed?: number) {
-  const chip = world.spawn('chip', x, seed);
+/** Runs the world until this chip settles. */
+function runUntilSettled(world: World, chip: ChipBody): SettledDrop {
   const events: WorldEvent[] = [];
   while (world.flying.includes(chip)) events.push(...world.step());
   return { chip, events };
 }
 
+/** Drops one chip and runs until it settles. */
+function dropOne(world: World, x: number): SettledDrop {
+  return runUntilSettled(world, world.spawn({ kindId: 'chip', x }));
+}
+
 /** Deterministic drop positions in [0, 1]. */
-function* positions(n: number, seed = 99) {
+function* positions(n: number, seed = 99): Generator<number> {
   let s = seed;
   for (let i = 0; i < n; i++) {
     s = (Math.imul(s, 1103515245) + 12345) >>> 0;
@@ -34,7 +59,7 @@ function* positions(n: number, seed = 99) {
   }
 }
 
-function histogram(world: World, xs: Iterable<number>) {
+function histogram(world: World, xs: Iterable<number>): number[] {
   const counts = new Array<number>(world.layout.slotCount).fill(0);
   for (const x of xs) {
     const { chip } = dropOne(world, x);
@@ -44,10 +69,57 @@ function histogram(world: World, xs: Iterable<number>) {
   return counts;
 }
 
+interface FlightStats {
+  /** Steps the chip spent outside the board's walls or below its floor. */
+  outside: number;
+  /** Closest any step brought the chip's centre to a peg's centre. */
+  closest: number;
+}
+
+/** Drops a chip and watches every step of its fall. */
+function flightStats(world: World, x: number): FlightStats {
+  const { layout } = world;
+  const chip = world.spawn({ kindId: 'chip', x });
+  const stats: FlightStats = { outside: 0, closest: Number.POSITIVE_INFINITY };
+  while (world.flying.includes(chip)) {
+    world.step();
+    const { x: cx, y: cy } = chip.pos;
+    if (cx <= 0 || cx >= layout.width || cy >= layout.floorY) stats.outside++;
+    for (const p of layout.pegs)
+      stats.closest = Math.min(stats.closest, Math.hypot(cx - p.x, cy - p.y));
+  }
+  return stats;
+}
+
+/** Holds the drop key at one spot: a chip every 0.1 s, 80 chips. Returns each chip's fall time. */
+function runBurst(world: World, x: number): number[] {
+  const ages: number[] = [];
+  let spawned = 0;
+  for (let step = 0; (spawned < 80 || world.flying.length > 0) && step < 120 / STEP; step++) {
+    if (spawned < 80 && step % 12 === 0) {
+      world.spawn({ kindId: 'chip', x });
+      spawned++;
+    }
+    ages.push(
+      ...world
+        .step()
+        .filter(isSettled)
+        .map((e) => e.chip.ageSteps * STEP),
+    );
+  }
+  return ages;
+}
+
+const isLanded = (e: WorldEvent): e is LandedEvent => e.type === 'landed';
+const isMissed = (e: WorldEvent): e is MissedEvent => e.type === 'missed';
+const isSettled = (e: WorldEvent): e is LandedEvent | MissedEvent => isLanded(e) || isMissed(e);
+
 describe('World: single drops', () => {
   it('replays a seeded drop exactly', () => {
-    const a = dropOne(makeWorld(), 0.37, 1234);
-    const b = dropOne(makeWorld({ physics: { seed: 999 } }), 0.37, 1234);
+    const replay = (world: World) =>
+      runUntilSettled(world, world.spawn({ kindId: 'chip', x: 0.37, seed: 1234 }));
+    const a = replay(makeWorld());
+    const b = replay(makeWorld({ physics: { seed: 999 } }));
     expect(b.chip.slotIndex).toBe(a.chip.slotIndex);
     expect(b.chip.ageSteps).toBe(a.chip.ageSteps);
     expect(b.chip.pos).toEqual(a.chip.pos);
@@ -87,19 +159,10 @@ describe('World: single drops', () => {
       physics: { gravity: 400, maxSpeed: 14, restitution: 0.6, jitter: 2 },
     });
     const { layout } = world;
-    let closest = Number.POSITIVE_INFINITY;
-    let outside = 0;
-    for (const x of positions(40)) {
-      const chip = world.spawn('chip', x);
-      while (world.flying.includes(chip)) {
-        world.step();
-        const { x: cx, y: cy } = chip.pos;
-        if (cx <= 0 || cx >= layout.width || cy >= layout.floorY) outside++;
-        for (const p of layout.pegs) closest = Math.min(closest, Math.hypot(cx - p.x, cy - p.y));
-      }
-    }
-    expect(outside).toBe(0);
+    const flights = [...positions(40)].map((x) => flightStats(world, x));
+    expect(flights.map((f) => f.outside)).toEqual(new Array(40).fill(0));
     // Contacts resolve each step, so overlap stays a small fraction of the radii.
+    const closest = Math.min(...flights.map((f) => f.closest));
     expect(closest).toBeGreaterThan(layout.chipRadius + layout.pegRadius - 0.1);
   });
 });
@@ -141,16 +204,13 @@ describe('World: piles and full board', () => {
     const events: WorldEvent[] = [];
     for (const x of positions(120)) events.push(...dropOne(world, x).events);
 
-    const missed = events.filter((e) => e.type === 'missed');
+    const { chipRadius, railTopY } = world.layout;
+    const bottom = (e: LandedEvent | MissedEvent) => e.chip.pos.y + chipRadius;
+    const missed = events.filter(isMissed);
     expect(missed.length).toBeGreaterThan(0);
-    for (const e of missed) {
-      expect(e.chip.slotIndex).toBeUndefined();
-      expect(e.chip.pos.y + world.layout.chipRadius).toBeLessThanOrEqual(world.layout.railTopY);
-    }
-    for (const e of events) {
-      if (e.type !== 'landed') continue;
-      expect(e.chip.pos.y + world.layout.chipRadius).toBeGreaterThan(world.layout.railTopY);
-    }
+    expect(missed.filter((e) => e.chip.slotIndex !== undefined)).toEqual([]);
+    expect(missed.filter((e) => bottom(e) > railTopY)).toEqual([]);
+    expect(events.filter(isLanded).filter((e) => bottom(e) <= railTopY)).toEqual([]);
   });
 
   it('emits full exactly once, when every slot has filled', () => {
@@ -197,17 +257,7 @@ describe('World: rapid fire', () => {
     [7, 0.5],
   ])('settles a held-down burst promptly (%i slots, x=%f)', (slots, x) => {
     const world = makeWorld({ slots });
-    const ages: number[] = [];
-    let spawned = 0;
-    for (let step = 0; (spawned < 80 || world.flying.length > 0) && step < 120 / STEP; step++) {
-      if (spawned < 80 && step % 12 === 0) {
-        world.spawn('chip', x);
-        spawned++;
-      }
-      for (const e of world.step()) {
-        if (e.type === 'landed' || e.type === 'missed') ages.push(e.chip.ageSteps * STEP);
-      }
-    }
+    const ages = runBurst(world, x);
     expect(ages).toHaveLength(80);
     expect(Math.max(...ages)).toBeLessThan(8);
     expect(world.full).toBe('slots');
@@ -215,7 +265,7 @@ describe('World: rapid fire', () => {
 
   it('handles 100 chips in flight at once', () => {
     const world = makeWorld();
-    for (const x of positions(100)) world.spawn('chip', x);
+    for (const x of positions(100)) world.spawn({ kindId: 'chip', x });
     const started = performance.now();
     let steps = 0;
     while (world.flying.length > 0 && steps < 60 / STEP) {

@@ -42,7 +42,7 @@ flowchart TB
 
         visitor -- "picks up, aims, drops chips" --> plinko
         dev -- "configures options and callbacks" --> plinko
-        plinko -- "onLand(chip, slot): host applies preference" --> backend
+        plinko -- "onLand({ chip, slot }): host applies preference" --> backend
         plinko -- "reads/writes chip supply" --> storage
         plinko -. "custom StorageAdapter" .-> backend
         plinko -- "live-region announcements" --> at
@@ -91,7 +91,7 @@ flowchart TB
 
         dev -- "npm install, import" --> hostApp
         hostApp -- "el.options ⇄<br/>plinko-* events" --> element
-        hostApp <-- "createPlinko · update · destroy<br/>⇄ onLand(chip, slot) callbacks" --> core
+        hostApp <-- "createPlinko · update · destroy<br/>⇄ onLand({ chip, slot }) callbacks" --> core
         element -- "wraps" --> core
         visitor -- "keyboard / pointer" --> dom
         core -- "renders into own wrapper" --> dom
@@ -138,7 +138,7 @@ flowchart TB
                 ptr["<b>Pointer input</b><br/><i>input/pointer.ts</i><br/>drag/click → command"]:::comp
             end
             cmds["<b>Command state machine</b><br/><i>commands.ts</i><br/>pickUp · aim · nudge · drop · cancel"]:::comp
-            board["<b>Board controller</b><br/><i>board.ts</i><br/>createPlinko(); public handle;<br/>wiring; host callbacks"]:::comp
+            board["<b>Board controller</b><br/><i>board.ts · assemble.ts · handle.ts</i><br/>createPlinko(); public handle;<br/>wiring; host callbacks"]:::comp
             loop["<b>Frame loop</b><br/><i>loop.ts</i><br/>RAF + 120 Hz fixed step;<br/>idle sleep; visibility pause"]:::comp
             subgraph views[" "]
                 direction LR
@@ -325,7 +325,7 @@ P8 (announce) also receives "picked up / dropped / cancelled" from P4 and "low /
 | `Command` | `{type:'pickUp', kind} \| {type:'aim', x} \| {type:'nudge', dx} \| {type:'drop'} \| {type:'cancel'}` | Input / handle → state machine |
 | `ChipBody` | `{ id, kindId, dropX, seed, rng, pos, prevPos, vel, pegHits, ageSteps, stillSteps, stillFrom, nudges, onPile, outcome?, slotIndex? }` | World ↔ board state |
 | `WorldEvent` | `{type:'pegHit', chip, pegIndex, speed} \| {type:'landed', chip, slotIndex} \| {type:'missed', chip} \| {type:'full', reason:'slots'\|'overflow'}` | World → controller |
-| Outcome callbacks | `onLand(chip, slot, details)` · `onMiss(chip, details)` · `onFull({ reason })`; `details = { dropId, dropX, pegHits, durationMs, seed }` | Controller → host, announcer |
+| Outcome callbacks | One object each: `onLand({ chip, slot, …details })` · `onMiss({ chip, …details })` · `onFull({ reason })`; `details = { dropId, dropX, pegHits, durationMs, seed }` | Controller → host, announcer |
 | `Settled` | `{ dropId }`: what `drop()` resolves with. Only "no longer in flight"; callbacks are the single source of outcomes. | Controller → host |
 | `SupplyState` | `{ v:1, counts, lastRefillAt? }` | Supply ↔ storage |
 
@@ -510,14 +510,14 @@ sequenceDiagram
     C->>W: spawn(chip, x=0.64, rng(seed, dropId))
     C->>Sup: reserve('on') (autoReload)
     C->>B: onDrop, still Holding
-    B->>Host: onDrop(chip, details)
+    B->>Host: onDrop({ chip, dropId, dropX })
     loop each fixed step (120 Hz) while chips in flight
         L->>W: step(1/120)
         W-->>B: pegHit events
-        B->>Host: onPegHit(chip, details)
+        B->>Host: onPegHit({ chip, pegIndex, speed, … })
     end
     W-->>B: landed(chipId, slotIndex=2)
-    B->>Host: onLand(chip, slot "Email Marketing", details)
+    B->>Host: onLand({ chip, slot: "Email Marketing", … })
     B->>A: "On chip landed in Email Marketing. 6 On chips left."
     Note over W,B: loop sleeps again once nothing is held or in flight
 ```
