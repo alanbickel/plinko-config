@@ -17,7 +17,12 @@ export class Announcer {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private flip = false;
 
-  constructor(private readonly input: AnnouncerInput) {}
+  constructor(private input: AnnouncerInput) {}
+
+  /** New wording for everything said from now on (board.update). */
+  setLabels(labels: Labels): void {
+    this.input = { ...this.input, labels };
+  }
 
   say(text: string): void {
     // Alternating a trailing zero-width space makes a repeated message count as a change,

@@ -4,6 +4,7 @@ import { type BoardContext, heldChip } from './context';
 import { applyPause } from './observe';
 import { requestChips, supplyChanged } from './supply';
 import type { DropOptions, PlinkoBoard, Settled, SupplyController } from './types';
+import { updateBoard } from './update';
 
 export interface HandleInput {
   ctx: BoardContext;
@@ -23,6 +24,9 @@ export function createHandle({ ctx, teardown }: HandleInput): PlinkoBoard {
     supply: supplyController(ctx),
     pause: () => setPausedByHost(ctx, true),
     resume: () => setPausedByHost(ctx, false),
+    update: (options) => {
+      if (!destroyed) updateBoard(ctx, options);
+    },
     destroy: () => {
       if (destroyed) return;
       destroyed = true;

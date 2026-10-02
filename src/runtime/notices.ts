@@ -6,8 +6,11 @@ import { type BoardContext, callHost, kindOf, stockOf } from './context';
 import { reportIfExhausted } from './supply';
 import { liftToY } from './view/geometry';
 
+// Handlers read ctx.config and ctx.announcer when they run, never earlier: board.update() can
+// replace the labels at any time.
 export function noticeHandlers(ctx: BoardContext): NoticeHandlers {
-  const { announcer, config } = ctx;
+  const labels = () => ctx.config.labels;
+  const say = (text: string) => ctx.announcer.say(text);
   const chip = (kindId: string) => ({ chip: kindOf(ctx, kindId) });
   const ignore = () => {};
   return {
@@ -15,17 +18,16 @@ export function noticeHandlers(ctx: BoardContext): NoticeHandlers {
     lifted: ignore,
     destroyed: ignore,
     pickedUp: (n) => onPickedUp(ctx, n),
-    zoneChanged: ({ inZone }) =>
-      announcer.say(inZone ? config.labels.enteredDropZone : config.labels.leftDropZone),
+    zoneChanged: ({ inZone }) => say(inZone ? labels().enteredDropZone : labels().leftDropZone),
     dropped: (n) => onDropped(ctx, n),
     lost: (n) => onLost(ctx, n),
     locked: () => onLocked(ctx),
     outOfChips: ({ kindId }) => {
       // A locked board has already said its last word.
-      if (!ctx.ui.lockReason) announcer.say(config.labels.outOfChips(stockOf(ctx, kindId)));
+      if (!ctx.ui.lockReason) say(labels().outOfChips(stockOf(ctx, kindId)));
     },
-    busy: () => announcer.say(config.labels.busy),
-    cancelled: ({ kindId }) => announcer.say(config.labels.cancelled(chip(kindId))),
+    busy: () => say(labels().busy),
+    cancelled: ({ kindId }) => say(labels().cancelled(chip(kindId))),
   };
 }
 
@@ -57,7 +59,6 @@ function onLost(ctx: BoardContext, { kindId, x, lift }: LostNotice): void {
 }
 
 function onLocked(ctx: BoardContext): void {
-  ctx.ui.lockedMessage = ctx.config.labels.locked;
   // Announce the landing that filled the board first, so the lock message is the last word.
   ctx.announcer.flush();
   ctx.announcer.say(ctx.config.labels.locked);

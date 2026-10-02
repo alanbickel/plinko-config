@@ -46,6 +46,12 @@ export interface CommandMachineInput {
   notify: (notice: Notice) => void;
 }
 
+/** The settings that can change on a live board (board.update). */
+export interface MachineSettings {
+  maxInFlight: number;
+  autoReload: boolean;
+}
+
 export interface DropCommand {
   /** Pick up the next chip of the kind straight away, if autoReload is on. Default true. */
   reload?: boolean;
@@ -143,7 +149,11 @@ export class CommandMachine {
   /** Most recently picked-up kind, for "pick up again" on the board. */
   private lastKindId: string | undefined;
 
-  constructor(private readonly input: CommandMachineInput) {}
+  constructor(private input: CommandMachineInput) {}
+
+  configure(settings: MachineSettings): void {
+    this.input = { ...this.input, ...settings };
+  }
 
   get state(): HeldState {
     return this.current;

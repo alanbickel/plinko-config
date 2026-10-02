@@ -23,8 +23,6 @@ export interface UiState {
   offscreen: boolean;
   /** Seed for the next spawn, set only while drop({ seed }) runs. */
   pendingSeed: number | undefined;
-  /** Shown over the board once it's full. */
-  lockedMessage: string | undefined;
   /** performance.now() of each peg's latest hit. */
   pegHits: Map<number, number>;
   lastPegHit: number;
@@ -74,7 +72,6 @@ export function initialUiState(): UiState {
     pausedByHost: false,
     offscreen: false,
     pendingSeed: undefined,
-    lockedMessage: undefined,
     pegHits: new Map(),
     lastPegHit: -Infinity,
     lockReason: undefined,

@@ -112,7 +112,7 @@ export class CanvasView {
   /** Width on the page, CSS pixels; set by resize. */
   private cssWidth = 1;
 
-  constructor(private readonly input: CanvasViewInput) {
+  constructor(private input: CanvasViewInput) {
     this.viewport = computeViewport(input.layout);
     this.carry = carryPath(input.layout);
     const g = input.canvas.getContext('2d');
@@ -140,6 +140,12 @@ export class CanvasView {
     this.painter?.paint(frame);
   }
 
+  /** New colours from the next frame on (board.update). */
+  setTheme(theme: Theme): void {
+    this.input = { ...this.input, theme };
+    this.painter?.setTheme(theme);
+  }
+
   /** What's under a point, or null outside the canvas. */
   hitTest(css: CssPoint): Hit | null {
     const { layout, kinds } = this.input;
@@ -162,8 +168,13 @@ class Painter {
   private readonly kindColor = new Map<string, string>();
   private scale = 1;
 
-  constructor(private readonly input: PainterInput) {
-    for (const k of input.kinds) this.kindColor.set(k.id, k.color ?? input.theme.chip);
+  constructor(private input: PainterInput) {
+    this.setTheme(input.theme);
+  }
+
+  setTheme(theme: Theme): void {
+    this.input = { ...this.input, theme };
+    for (const k of this.input.kinds) this.kindColor.set(k.id, k.color ?? theme.chip);
   }
 
   setScale(scale: number): void {

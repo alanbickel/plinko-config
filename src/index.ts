@@ -18,9 +18,18 @@ export type {
 export { PlinkoConfigError } from './core/validate';
 export { createPlinko } from './runtime/board';
 export { DEFAULT_KEYS, type KeyBindings } from './runtime/input/keyboard';
-export { DEFAULT_LABELS, type Labels } from './runtime/labels';
+export {
+  type BatchLabelInput,
+  type ChipLabel,
+  type ChipLabelInput,
+  DEFAULT_LABELS,
+  type Labels,
+  type LandingLabelInput,
+  type StockLabelInput,
+} from './runtime/labels';
 export { DEFAULT_THEME, type Theme } from './runtime/theme';
 export type {
+  BoardUpdate,
   ChipDetails,
   DropDetails,
   DropOptions,
@@ -28,6 +37,7 @@ export type {
   FullReason,
   LandDetails,
   MissDetails,
+  MountOnlyOption,
   PegHitDetails,
   PlinkoBoard,
   PlinkoOptions,

@@ -35,7 +35,7 @@ function frameState(ctx: BoardContext, alpha: number): FrameState {
     focused: ui.focused,
     counts: chips.map((c) => ctx.supply.count(c.id)),
     trayNotes: chips.map((c) => trayNote(ctx, c.id)),
-    lockedMessage: ui.lockedMessage,
+    lockedMessage: ui.lockReason ? ctx.config.labels.locked : undefined,
     pegHits: ui.pegHits,
     alpha,
     now,

@@ -12,14 +12,15 @@ import type { PlinkoBoard, PlinkoOptions } from './types';
 export function createPlinko<CV = unknown, SV = unknown>(
   target: HTMLElement | string,
   options: PlinkoOptions<CV, SV>,
-): PlinkoBoard {
+): PlinkoBoard<CV, SV> {
   const host = resolveHost(target);
   // Internally chips and slots are opaque; the generics only type the host's callbacks.
   const ctx = assemble({ host, options: options as unknown as PlinkoOptions });
   const teardown = [attachInput(ctx), observeHost(ctx), startRefills(ctx)];
   fitToHost(ctx);
   supplyChanged(ctx); // first report; also locks at once if there are no chips at all
-  return createHandle({ ctx, teardown });
+  // Internally callbacks take opaque chips and slots; the handle's generics are for the host.
+  return createHandle({ ctx, teardown }) as PlinkoBoard<CV, SV>;
 }
 
 function resolveHost(target: HTMLElement | string): HTMLElement {

@@ -38,11 +38,11 @@ function hostRoom({ host, win, dom }: BoardContext): number {
 
 /**
  * Screen height left for the canvas. Touch drags can't scroll the page (touch-action: none), so
- * the whole board, tray included, must fit on screen. documentElement.clientHeight is the height
- * with mobile browser bars shown, so the board doesn't resize as they hide and show.
+ * the whole board, tray included, must fit on screen. The ruler is as tall as the screen with
+ * mobile browser bars shown, so the board doesn't resize as they hide and show.
  */
-function screenRoom({ win, dom }: BoardContext): number {
-  return usable((win?.document.documentElement.clientHeight ?? 0) - dom.wrapper.offsetHeight);
+function screenRoom({ dom }: BoardContext): number {
+  return usable(dom.screenRuler.offsetHeight - dom.wrapper.offsetHeight);
 }
 
 /** A height of 1px or less means nothing measurable: no limit. */

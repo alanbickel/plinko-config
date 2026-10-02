@@ -466,7 +466,11 @@ sequenceDiagram
 
 `createPlinko` is synchronous and the board is usable immediately: there is nothing to load. To restore chip counts after a reload, the host passes saved counts as `chips[].count`.
 
-**Sizing.** The board fills the host's width, but is never taller than the screen (the height with mobile browser bars shown, `documentElement.clientHeight`, so it doesn't resize as they hide and show). Touch drags can't scroll the page, so the whole board, tray included, must fit on screen. If the host has a height of its own, the board also fits inside it, centred. To tell the two apart, the board collapses its canvas for a moment and measures what height the host keeps. The wrapper, the host, and the window are observed, and refits run on the next frame: refitting inside a ResizeObserver callback, when the host's height follows the canvas, makes the browser report an error on the page.
+**Sizing.** The board fills the host's width, but is never taller than the screen. The screen's height comes from a hidden ruler inside the wrapper, `100svh` tall (the height with mobile browser bars shown, so the board doesn't resize as they hide and show), clipped by a zero-size box so it never adds to the page's scroll height. Touch drags can't scroll the page, so the whole board, tray included, must fit on screen. If the host has a height of its own, the board also fits inside it, centred. To tell the two apart, the board collapses its canvas for a moment and measures what height the host keeps. The wrapper, the host, and the ruler are observed (a ResizeObserver, so no window listener), and refits run on the next frame: refitting inside a ResizeObserver callback, when the host's height follows the canvas, makes the browser report an error on the page.
+
+**Live updates.** `board.update(options)` changes a live board: callbacks, labels, theme, keys, step sizes, `autoReload`, `maxInFlight`. It validates everything before changing anything, and refuses the *mount-only* options (`slots`, `chips`, `board`, `physics`, `supply`, `attribution`) with a `PlinkoConfigError`: those shape the world, so changing them means a new board, and a live board never silently loses its piles. Handlers read options and labels when they run, never earlier, so an update applies from the next event on.
+
+**`<plinko-board>`.** The element mounts the board in an open shadow root once it is connected and has `options`, and destroys it when disconnected. Setting `options` again calls `update()` for live options, or remounts when a mount-only option changes *by value* (frameworks often rebuild the options object on every render, and identity would remount each time). Every callback is also fired as a bubbling, composed `plinko-*` event (`plinko-land`, `plinko-drop`, …) carrying the callback's object; `onRequest` stays a callback, since an event can't answer. Importing the entry registers the tag once (`definePlinkoBoard(tag)` registers other names), and importing it without a DOM (server rendering) does nothing.
 
 ---
 
@@ -567,4 +571,4 @@ flowchart TB
 3. **Views are derived.** They read state and never write it.
 4. **Host callbacks run outside the physics step**, wrapped in try/catch.
 5. **No global side effects.** No `window`/`document` listeners, no global styles (styles are scoped to the wrapper), nothing at import time except in `element.js`.
-6. **`destroy()` is total.** It cancels RAF, disconnects observers, removes listeners and nodes, releases reservations, and flushes saves. Calling it twice is safe.
+6. **`destroy()` is total.** It cancels RAF, disconnects observers, removes listeners and nodes, releases reservations, and stops refill timers. Calling it twice is safe.

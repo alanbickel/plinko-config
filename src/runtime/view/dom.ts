@@ -6,6 +6,10 @@ import type { Labels } from '../labels';
 const VISUALLY_HIDDEN =
   'position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;' +
   'clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0';
+/** Clips the screen ruler so its height never adds to the page's scrollable area. */
+const RULER_BOX = 'position:absolute;top:0;left:0;width:0;height:0;overflow:hidden';
+/** As tall as the screen with mobile browser bars shown (svh), so it doesn't change as they hide. */
+const RULER = 'width:0;height:100vh;height:100svh;visibility:hidden';
 const ATTRIBUTION_URL = 'https://github.com/KilledByAPixel/LittleJS';
 
 let instance = 0;
@@ -13,7 +17,11 @@ let instance = 0;
 export interface BoardDom {
   wrapper: HTMLDivElement;
   canvas: HTMLCanvasElement;
+  /** Read once when the board gets focus (aria-describedby). */
+  instructions: HTMLParagraphElement;
   live: HTMLDivElement;
+  /** Measures the screen's height; observed instead of listening on window (no global listeners). */
+  screenRuler: HTMLDivElement;
   attribution: HTMLAnchorElement | undefined;
 }
 
@@ -35,12 +43,26 @@ export function createDom({ host, labels, attribution }: CreateDomInput): BoardD
   const make: Maker = { doc: host.ownerDocument, id: `plinko-config-${++instance}`, labels };
   const wrapper = createWrapper(make);
   const canvas = createCanvas(make);
+  const instructions = createInstructions(make);
   const live = createLiveRegion(make);
-  wrapper.append(canvas, createInstructions(make), live);
+  const screenRuler = make.doc.createElement('div');
+  screenRuler.style.cssText = RULER;
+  const rulerBox = make.doc.createElement('div');
+  rulerBox.setAttribute('aria-hidden', 'true');
+  rulerBox.style.cssText = RULER_BOX;
+  rulerBox.append(screenRuler);
+  wrapper.append(canvas, instructions, live, rulerBox);
   const link = attribution ? createAttribution(make) : undefined;
   if (link) wrapper.append(link);
   host.append(wrapper);
-  return { wrapper, canvas, live, attribution: link };
+  return { wrapper, canvas, instructions, live, screenRuler, attribution: link };
+}
+
+/** Puts new wording on the nodes that carry labels (board.update). */
+export function applyLabels(dom: BoardDom, labels: Labels): void {
+  dom.canvas.setAttribute('aria-label', labels.board);
+  dom.instructions.textContent = labels.instructions;
+  if (dom.attribution) dom.attribution.textContent = labels.attribution;
 }
 
 function createWrapper({ doc }: Maker): HTMLDivElement {

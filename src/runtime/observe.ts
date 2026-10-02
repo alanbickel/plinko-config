@@ -1,4 +1,4 @@
-// Size, screen, and visibility observers. The observers are optional: environments without them
+// Size and visibility observers. The observers are optional: environments without them
 // just don't refit or pause.
 
 import type { BoardContext } from './context';
@@ -9,11 +9,9 @@ export function observeHost(ctx: BoardContext): () => void {
   const refit = deferredFit(ctx);
   const resize = observeSize(ctx, refit);
   const visibility = observeVisibility(ctx);
-  const stopScreen = observeScreen(ctx, refit);
   return () => {
     resize?.disconnect();
     visibility?.disconnect();
-    stopScreen();
     refit.cancel();
   };
 }
@@ -59,15 +57,9 @@ function observeSize(ctx: BoardContext, refit: DeferredFit): ResizeObserver | un
   const observer = new ResizeObserver(() => refit.schedule());
   observer.observe(ctx.dom.wrapper);
   observer.observe(ctx.host);
+  // The board never outgrows the screen, so a change in screen height can mean a refit.
+  observer.observe(ctx.dom.screenRuler);
   return observer;
-}
-
-/** The board never outgrows the screen, so a window resize can mean a refit. */
-function observeScreen(ctx: BoardContext, refit: DeferredFit): () => void {
-  const { win } = ctx;
-  const onResize = () => refit.schedule();
-  win?.addEventListener('resize', onResize);
-  return () => win?.removeEventListener('resize', onResize);
 }
 
 function observeVisibility(ctx: BoardContext): IntersectionObserver | undefined {

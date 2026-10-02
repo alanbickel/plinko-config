@@ -474,6 +474,85 @@ describe('supply', () => {
   });
 });
 
+describe('update', () => {
+  it('swaps callbacks: the new one fires, the old one never again', () => {
+    const before = vi.fn();
+    const after = vi.fn();
+    const b = mount({ onDrop: before });
+    b.update({ onDrop: after });
+    void b.drop({ chip: 'on' });
+    expect(before).not.toHaveBeenCalled();
+    expect(after).toHaveBeenCalledOnce();
+  });
+
+  it('puts new wording on the canvas, the instructions, and announcements', () => {
+    const b = mount();
+    b.update({ labels: { board: 'Settings, the hard way', instructions: 'Good luck.' } });
+    const canvas = canvasOf(b);
+    expect(canvas.getAttribute('aria-label')).toBe('Settings, the hard way');
+    const describedBy = canvas.getAttribute('aria-describedby') ?? '';
+    expect(document.getElementById(describedBy)?.textContent).toBe('Good luck.');
+    b.update({ labels: { cancelled: ({ chip }) => `${chip.label}: back you go.` } });
+    press(b, 'Enter');
+    press(b, 'Escape');
+    expect(liveText(b)).toBe('On: back you go.');
+  });
+
+  it('applies new keys, step sizes, and autoReload', () => {
+    const onDrop = vi.fn();
+    const b = mount({ onDrop });
+    b.update({ keys: { drop: ['d'] }, liftStep: 1, autoReload: false });
+    press(b, 'Enter');
+    press(b, 'ArrowUp'); // one step: straight into the drop zone
+    press(b, 'd');
+    expect(onDrop).toHaveBeenCalledOnce();
+    expect(b.element.dataset.state).toBe('idle'); // no reload
+  });
+
+  it('applies maxInFlight', async () => {
+    const b = mount();
+    b.update({ maxInFlight: 1 });
+    void b.drop({ chip: 'on' });
+    await expect(b.drop({ chip: 'on' })).rejects.toThrow(/can't drop/);
+  });
+
+  it('sets an option back to its default when given undefined', () => {
+    const onDrop = vi.fn();
+    const b = mount({ onDrop, keys: { drop: ['d'] }, liftStep: 1 });
+    b.update({ keys: undefined });
+    press(b, 'Enter');
+    press(b, 'ArrowUp');
+    press(b, 'Enter'); // the default drop key again
+    expect(onDrop).toHaveBeenCalledOnce();
+  });
+
+  it('refuses mount-only options and changes nothing', () => {
+    const before = vi.fn();
+    const after = vi.fn();
+    const b = mount({ onPickUp: before });
+    const sneaky = { onPickUp: after, slots: [], attribution: false } as Parameters<
+      typeof b.update
+    >[0];
+    expect(() => b.update(sneaky)).toThrow(PlinkoConfigError);
+    expect(() => b.update(sneaky)).toThrow(/can't change slots, attribution/);
+    press(b, 'Enter');
+    expect(before).toHaveBeenCalledOnce();
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it('refuses invalid values and changes nothing', () => {
+    const b = mount();
+    expect(() => b.update({ aimStep: 2, labels: { board: 'changed' } })).toThrow(/aimStep/);
+    expect(canvasOf(b).getAttribute('aria-label')).toBe('Plinko preferences board');
+  });
+
+  it('does nothing after destroy', () => {
+    const b = mount();
+    b.destroy();
+    expect(() => b.update({ aimStep: 0.5 })).not.toThrow();
+  });
+});
+
 describe('destroy', () => {
   it('removes everything and leaves the host as it was', () => {
     const b = mount();

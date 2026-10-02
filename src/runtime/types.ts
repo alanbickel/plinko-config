@@ -102,6 +102,17 @@ export interface PlinkoOptions<CV = unknown, SV = unknown> extends CoreOptions<C
   onRequest?: (details: ChipDetails<CV>) => RequestAnswer | Promise<RequestAnswer>;
 }
 
+/**
+ * Options fixed when the board is created. They shape the world itself (or its DOM), so
+ * board.update() rejects them: destroy the board and create a new one instead.
+ */
+export type MountOnlyOption = 'slots' | 'chips' | 'board' | 'physics' | 'supply' | 'attribution';
+
+/** What board.update() accepts: every option except the mount-only ones. */
+export type BoardUpdate<CV = unknown, SV = unknown> = Partial<
+  Omit<PlinkoOptions<CV, SV>, MountOnlyOption>
+>;
+
 export interface DropOptions {
   /** Kind to drop; picks it up first if needed. Defaults to the held or last-used kind. */
   chip?: string;
@@ -126,7 +137,7 @@ export interface SupplyController {
   request(request: SupplyRequest): Promise<RequestAnswer>;
 }
 
-export interface PlinkoBoard {
+export interface PlinkoBoard<CV = unknown, SV = unknown> {
   /** Picks up a chip of this kind. False if the kind is unknown, none are left, or the board is locked. */
   pickUp(chipId: string): boolean;
   /** Moves the held chip, 0..1. */
@@ -139,6 +150,12 @@ export interface PlinkoBoard {
   /** Freezes the simulation and rendering. */
   pause(): void;
   resume(): void;
+  /**
+   * Changes options on the live board: callbacks, labels, theme, keys, step sizes, autoReload,
+   * maxInFlight. Options left out keep their values; an option set to undefined goes back to its
+   * default. Throws PlinkoConfigError for mount-only options or invalid values, changing nothing.
+   */
+  update(options: BoardUpdate<CV, SV>): void;
   /** Removes everything the board added: DOM, listeners, observers, timers, the frame loop. */
   destroy(): void;
   /** The wrapper element appended inside the target. */

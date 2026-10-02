@@ -1,2 +1,11 @@
-// <plinko-board> Web Component. Registers itself on import (the package's only side effect). Lands in M6.
-export {};
+// plinko-config/element: registers <plinko-board> on import (the package's only side effect).
+
+import { definePlinkoBoard } from './runtime/element';
+
+export {
+  definePlinkoBoard,
+  PlinkoBoardElement,
+  type PlinkoBoardEventMap,
+} from './runtime/element';
+
+definePlinkoBoard();

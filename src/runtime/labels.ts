@@ -22,7 +22,8 @@ export interface BatchLabelInput {
   missed: number;
 }
 
-type ChipLabel = (input: ChipLabelInput) => string;
+/** A template for announcements about one chip. */
+export type ChipLabel = (input: ChipLabelInput) => string;
 
 /** Every user-facing string. Functions are announcement templates; override any of them. */
 export interface Labels {
