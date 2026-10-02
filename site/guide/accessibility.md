@@ -4,11 +4,11 @@ description: Keyboard controls, screen-reader announcements, focus, reduced moti
 
 # Accessibility
 
-The whole game can be played with a keyboard, and every important moment is announced to screen readers. All the text is yours to change through the `labels` option.
+The whole game can be played with a keyboard, and every important moment is announced to screen readers. The text players see and hear comes from two places: the `label` on each item in `chips` and `slots` (shown in the tray and under the slots, and spoken in announcements), and the board's own wording in the `labels` option.
 
 ## Focus
 
-The board is a single tab stop: the canvas. It has `role="application"`, a `game` role description, a name from `labels.board`, and a description from `labels.instructions` that's read once when it gets focus.
+The board is a single tab stop: the canvas. It has `role="application"`, a role description from `labels.roleDescription` (what screen readers call it, `"game"` by default), a name from `labels.board`, and a description from `labels.instructions` that's read once when it gets focus.
 
 The board never handles Tab or keys pressed with Ctrl, Alt, or Meta, so focus can always move on. The focus ring is drawn on the canvas in the theme's `focus` colour. It's hidden after a mouse or touch interaction and comes back on the next key press.
 
@@ -32,9 +32,13 @@ While holding a chip:
 | Enter or Space | Drop it |
 | Escape | Put it back in the tray |
 
-↓ never drops a chip. Dropping outside the drop zone loses the chip, by design. That one's a prank, and it's announced.
+### Custom keys
 
-Step sizes come from `aimStep`, `aimStepLarge`, `liftStep`, and `liftStepLarge`. Rebind any action with the `keys` option. The defaults are in [`DEFAULT_KEYS`](../api/plinko-config/variables/DEFAULT_KEYS).
+The `keys` option maps each action to a list of [`KeyboardEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key) values. Actions you leave out keep their defaults from [`DEFAULT_KEYS`](../api/plinko-config/variables/DEFAULT_KEYS). An action you list gets exactly the keys you give it, so include the defaults you want to keep.
+
+<<< ../examples/accessibility.ts#keys
+
+The actions are `left`, `right`, `up`, `down`, `home`, `end`, `pickUp`, `drop`, and `cancel`. See [`KeyBindings`](../api/plinko-config/interfaces/KeyBindings).
 
 ## Announcements
 
@@ -50,7 +54,15 @@ Announcements go to a polite `aria-live` region. They cover:
 - too many chips in the air
 - the board locking when it's full (trying to pick up again repeats the message)
 
-The same message is announced again if it repeats. Every message comes from a template in `labels`, so you can reword or translate any of them. See [`Labels`](../api/plinko-config/interfaces/Labels) and [`DEFAULT_LABELS`](../api/plinko-config/variables/DEFAULT_LABELS).
+The same message is announced again if it repeats.
+
+### Wording
+
+Most messages name a chip or slot, using the `label` you gave it in `chips` or `slots`. The rest of each message comes from `labels`. Plain strings are used as they are. Templates are functions that receive the chip (and, for landings, the slot) and return the message. Override any of them to reword or translate. Labels you leave out keep the English defaults.
+
+<<< ../examples/accessibility.ts#labels
+
+See [`Labels`](../api/plinko-config/interfaces/Labels) for what each template receives, and [`DEFAULT_LABELS`](../api/plinko-config/variables/DEFAULT_LABELS) for the defaults.
 
 ## Reduced motion
 
@@ -63,9 +75,7 @@ With reduced motion:
 - lost chips fade out instead of falling
 - scrolling the board into view is instant instead of smooth
 
-Nothing else changes. Callbacks fire in the same order (`onDrop`, the peg hits, then `onLand` or `onMiss`, then the `drop()` promise resolves), and a seeded drop lands in the same slot as it would with animation.
-
-To try it, turn on "Emulate CSS prefers-reduced-motion: reduce" in your browser's developer tools, or turn off animation effects in your operating system's accessibility settings.
+For background, see [WCAG 2.2: Animation from Interactions](https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html).
 
 ## Touch
 
