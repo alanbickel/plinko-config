@@ -1,0 +1,12 @@
+{
+  "$comment": "Type-checks the docs examples with the root TypeScript 7: tsc -p site/examples. Framework recipes have their own tsconfigs.",
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "plinko-config": ["../../src/index.ts"],
+      "plinko-config/element": ["../../src/element.ts"]
+    }
+  },
+  "include": ["."],
+  "exclude": ["recipes"]
+}

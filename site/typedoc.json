@@ -1,0 +1,13 @@
+{
+  "$schema": "https://typedoc-plugin-markdown.org/schema.json",
+  "entryPoints": ["../src/index.ts"],
+  "tsconfig": "./tsconfig.typedoc.json",
+  "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
+  "out": "./api",
+  "docsRoot": ".",
+  "readme": "none",
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "sort": ["kind", "alphabetical"],
+  "validation": { "notExported": true, "invalidLink": true, "notDocumented": false }
+}

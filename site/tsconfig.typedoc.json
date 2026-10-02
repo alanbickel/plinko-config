@@ -1,0 +1,19 @@
+{
+  "$comment": "TypeDoc only (TypeScript 6). Mirrors the root compilerOptions, minus vite/client types.",
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": []
+  },
+  "include": ["../src"],
+  "exclude": ["../src/**/*.test.ts", "../src/setupTests.ts"]
+}
