@@ -36,8 +36,9 @@ export interface GeometryInput {
 export function computeViewport({ layout, strip }: GeometryInput): Viewport {
   const y0 = layout.spawnY - TOP;
   const trayY = layout.floorY + FLOOR + strip.height;
-  const w = layout.width + 2 * SIDE + strip.extraRight;
-  return { x0: -SIDE, y0, w, h: trayY + TRAY_H - y0, trayY };
+  // The label room is mirrored on the left so the board stays centred.
+  const side = SIDE + strip.extraRight;
+  return { x0: -side, y0, w: layout.width + 2 * side, h: trayY + TRAY_H - y0, trayY };
 }
 
 /**

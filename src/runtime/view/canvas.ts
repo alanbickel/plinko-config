@@ -300,7 +300,7 @@ class Painter {
     g.setTransform(s, 0, 0, s, -viewport.x0 * s, -viewport.y0 * s);
   }
 
-  /** Walls and floor, drawn thinner than the physics walls; bumps on top. */
+  /** Walls and floor, drawn thinner than the physics walls; bumps on top, cut off at the walls. */
   private drawFrame(): void {
     const { g, layout, theme } = this.input;
     const top = layout.spawnY - 0.2;
@@ -308,7 +308,12 @@ class Painter {
     g.fillRect(-WALL, top, WALL, layout.floorY - top);
     g.fillRect(layout.width, top, WALL, layout.floorY - top);
     g.fillRect(-WALL, layout.floorY, layout.width + 2 * WALL, FLOOR);
+    g.save();
+    g.beginPath();
+    g.rect(-WALL, top, layout.width + 2 * WALL, layout.floorY - top);
+    g.clip();
     for (const bump of layout.wallBumps) this.circle(bump, theme.wall);
+    g.restore();
   }
 
   private drawRails(): void {
