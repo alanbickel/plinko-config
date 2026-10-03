@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The playground view. Logic lives in config.ts, board.ts and export.ts (type-checked); this file
 // only binds controls to the config and shows the outputs.
+import { useData } from 'vitepress';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import {
   type Announcement,
@@ -18,7 +19,9 @@ import {
 } from './controls';
 import { exportConfig } from './export';
 
-const config = reactive<PlaygroundConfig>(initialConfig());
+// biome-ignore lint/correctness/useHookAtTopLevel: a React rule; <script setup> is setup()
+const { isDark } = useData();
+const config = reactive<PlaygroundConfig>(initialConfig(isDark.value ? 'dark' : 'light'));
 const host = ref<HTMLElement>();
 const error = ref('');
 const log = ref<LogEntry[]>([]);
@@ -81,10 +84,37 @@ onMounted(() => {
       error.value = message;
     },
   });
+  sizer.observe(host.value);
+  remounts.observe(host.value, { childList: true, subtree: true });
   board.apply(snapshot());
 });
-onBeforeUnmount(() => board?.destroy());
+onBeforeUnmount(() => {
+  sizer.disconnect();
+  remounts.disconnect();
+  board?.destroy();
+});
 watch(config, () => board?.apply(snapshot()), { deep: true });
+
+// Side by side, the panel ends where the board's canvas does (not its attribution link). The
+// canvas arrives after mount and is replaced on remount, so each fit re-targets the observer.
+const panel = ref<HTMLElement>();
+const panelMaxHeight = ref<string>();
+let canvas: HTMLCanvasElement | null = null;
+const sizer = new ResizeObserver(() => fitPanel());
+const remounts = new MutationObserver(() => fitPanel());
+function fitPanel() {
+  const next = host.value?.querySelector('canvas') ?? null;
+  if (next !== canvas) {
+    if (canvas) sizer.unobserve(canvas);
+    if (next) sizer.observe(next);
+    canvas = next;
+  }
+  if (!canvas || !panel.value) return;
+  const height = canvas.getBoundingClientRect().bottom - panel.value.getBoundingClientRect().top;
+  panelMaxHeight.value = height > 0 ? `${height}px` : undefined;
+}
+// The board follows the page's theme toggle; the Theme control overrides it until the next toggle.
+watch(isDark, (dark) => (config.theme = dark ? 'dark' : 'light'));
 watch(paused, (on) => board?.setPaused(on));
 watch(autoDrop, (on) => board?.setAutoDrop(on));
 
@@ -137,12 +167,12 @@ const tint = (hex: string) => `${hex}40`;
           Auto-drop {{ autoDrop ? 'on' : 'off' }}
         </button>
       </div>
+      <p class="hint">Drag a chip up into the glowing drop zone,<br />or Tab to the board and use the keyboard.</p>
       <div ref="host" class="host" />
       <p v-if="error" class="error" role="alert">{{ error }} (the board keeps its last valid setup)</p>
-      <p class="hint">Drag a chip up into the glowing drop zone, or Tab to the board and use the keyboard.</p>
     </div>
 
-    <div class="panel">
+    <div ref="panel" class="panel" :style="{ maxHeight: panelMaxHeight }">
       <div class="tabs" role="tablist">
         <button
           v-for="t in TABS"
@@ -157,12 +187,12 @@ const tint = (hex: string) => `${hex}40`;
           {{ t.label }}
         </button>
       </div>
+      <p v-show="tab === 'configure'" class="note">
+        <em>Live</em> changes can be applied at runtime by calling <code>update()</code>. <em>Remount</em> changes are
+        rejected by <code>update()</code> and require the board to be destroyed and re-mounted.
+      </p>
 
       <div v-show="tab === 'configure'" id="panel-configure" class="stack" role="tabpanel" aria-labelledby="tab-configure">
-        <p class="note">
-          <em>Live</em> changes can be applied at runtime by calling <code>update()</code>. <em>Remount</em> changes are
-          rejected by <code>update()</code> and require the board to be destroyed and re-mounted.
-        </p>
         <details open>
           <summary>Content <small>remount</small></summary>
           <p class="note">Tints and colours are live.</p>
@@ -198,6 +228,18 @@ const tint = (hex: string) => `${hex}40`;
             <button type="button" :disabled="config.chips.length <= 1" :aria-label="`Remove chip ${chip.label}`" @click="config.chips.splice(i, 1)">×</button>
           </div>
           <button type="button" class="add" :disabled="config.chips.length >= 6" @click="addChip">+ Chip</button>
+        </details>
+
+        <details>
+          <summary>Theme <small>live</small></summary>
+          <p class="note">Starts with the page's theme and follows its toggle.</p>
+          <label class="field">
+            Colours
+            <select v-model="config.theme">
+              <option value="dark">Dark (library default)</option>
+              <option value="light">Light</option>
+            </select>
+          </label>
         </details>
 
         <details>
@@ -354,17 +396,35 @@ const tint = (hex: string) => `${hex}40`;
   align-items: start;
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  /* The panel gets at least 380px and grows with the screen; the board keeps what it needs. */
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 1.2fr);
   margin: 0 auto;
-  max-width: 1200px;
+  max-width: 1600px;
   padding: 24px;
 }
 /* The board stays in view while the panel scrolls (two-column layout only). */
+.stage,
+.panel {
+  position: sticky;
+  top: calc(var(--vp-nav-height) + 16px);
+}
 .stage {
   display: grid;
   gap: 8px;
-  position: sticky;
-  top: calc(var(--vp-nav-height) + 16px);
+}
+/* The panel fits the viewport: tabs and the note stay put, only the tab's content scrolls. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Less the playground's top and bottom padding, so the page itself doesn't scroll. */
+  max-height: calc(100dvh - var(--vp-nav-height) - 48px);
+}
+.panel > [role='tabpanel'] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 .toolbar {
   display: flex;
@@ -379,6 +439,7 @@ const tint = (hex: string) => `${hex}40`;
   margin: 0;
 }
 .hint {
+  font-style: italic;
   text-align: center;
 }
 .note {
@@ -505,7 +566,6 @@ input[type='color'] {
 .tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 8px;
 }
 .log {
   font-size: 13px;
@@ -564,16 +624,18 @@ input[type='color'] {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.export {
+/* Copy stays put; the code scrolls. */
+.panel > .export {
   display: grid;
   gap: 8px;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
 }
 .export pre {
   background: var(--vp-c-bg-soft);
   border-radius: 8px;
   font-size: 13px;
   margin: 0;
-  max-height: min(72vh, 680px);
   overflow: auto;
   padding: 12px;
 }
@@ -584,7 +646,8 @@ input[type='color'] {
   .playground {
     grid-template-columns: 1fr;
   }
-  .stage {
+  .stage,
+  .panel {
     position: static;
   }
   .host {

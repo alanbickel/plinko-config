@@ -6,6 +6,7 @@ import {
   DEFAULT_CONTROLS,
   DEFAULT_PHYSICS,
   DEFAULT_SLOT_LABELS,
+  LIGHT_THEME,
   type PlaygroundConfig,
 } from './config';
 
@@ -55,6 +56,7 @@ function optionsLiteral(config: PlaygroundConfig): LiteralObject {
     physics: compact(physics),
     supply: supplyLiteral(config),
     ...compact(changed(config.controls, DEFAULT_CONTROLS)),
+    theme: config.theme === 'light' ? { ...LIGHT_THEME } : undefined,
     styles: compact({ slots: styleEntries(config.slots), chips: styleEntries(config.chips) }),
   });
 }

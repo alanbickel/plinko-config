@@ -7,6 +7,7 @@ import {
   DEFAULT_BOARD,
   DEFAULT_PHYSICS,
   DEFAULT_SLOT_LABELS,
+  DEFAULT_THEME,
   type MotionPreference,
   type PhysicsConfig,
   type PlinkoOptions,
@@ -14,6 +15,7 @@ import {
   type RequestAnswer,
   type SlotLabelOptions,
   type Styles,
+  type Theme,
 } from '../../../../src/index';
 
 export { DEFAULT_BOARD, DEFAULT_PHYSICS, DEFAULT_SLOT_LABELS };
@@ -57,7 +59,28 @@ export interface ControlsDraft {
   liftStepLarge: number | null;
 }
 
+/** The board's colours: the library's built-in dark theme, or the playground's light one. */
+export type ThemeChoice = 'dark' | 'light';
+
+/** For light pages. Text, muted text and focus meet WCAG AA (≥ 4.5:1) on the background and tray. */
+export const LIGHT_THEME: Theme = {
+  background: '#f4f6f9',
+  wall: '#b3bcc8',
+  peg: '#5c6b7e',
+  pegHit: '#e0a100',
+  rail: '#8794a6',
+  chip: '#ffb347',
+  chipStroke: '#1f2933',
+  text: '#1f2933',
+  mutedText: '#4f5a68',
+  focus: '#0a5fc2',
+  tray: '#e3e7ed',
+  dropZone: '#c27c00',
+  overlay: 'rgba(244, 246, 249, 0.9)',
+};
+
 export interface PlaygroundConfig {
+  theme: ThemeChoice;
   slots: SlotDraft[];
   chips: ChipDraft[];
   physics: Required<Omit<PhysicsConfig, 'seed' | 'bias'>>;
@@ -80,8 +103,9 @@ export const DEFAULT_CONTROLS: ControlsDraft = {
   liftStepLarge: null,
 };
 
-export function initialConfig(): PlaygroundConfig {
+export function initialConfig(theme: ThemeChoice): PlaygroundConfig {
   return {
+    theme,
     slots: [
       { id: 'product-alerts', label: 'Product Alerts', fill: '' },
       { id: 'status-alerts', label: 'Status Alerts', fill: '' },
@@ -128,6 +152,7 @@ export function liveOptions(config: PlaygroundConfig): BoardUpdate {
     aimStepLarge: aimStepLarge ?? undefined,
     liftStep: liftStep ?? undefined,
     liftStepLarge: liftStepLarge ?? undefined,
+    theme: config.theme === 'light' ? LIGHT_THEME : DEFAULT_THEME,
     styles: styles(config),
     slotLabels: { ...config.slotLabels },
   };
