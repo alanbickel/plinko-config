@@ -1,6 +1,6 @@
 # plinko-config
 
-Follow [CONTRIBUTING.md](CONTRIBUTING.md): its coding standards apply to every change. Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Follow [CONTRIBUTING.md](CONTRIBUTING.md): its coding standards apply to every change. Architecture: [site/internals/](site/internals/) (behaviour hosts rely on: [site/lifecycle/](site/lifecycle/), [site/contracts/](site/contracts/)).
 
 - `src/core/` is pure TypeScript (no DOM, timers, or `Math.random`); `src/runtime/` owns the DOM. Biome enforces the boundary.
 - Verify with `npm run check`; run `npm run test:e2e` for runtime or demo changes.

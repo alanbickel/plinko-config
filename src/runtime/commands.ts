@@ -1,5 +1,6 @@
-// The held-chip state machine (ARCHITECTURE.md §5). Keyboard, pointer, and handle calls all feed
-// it. Pure: no DOM. In-flight chips live in the world, not here, which is what allows rapid fire.
+// The held-chip state machine (site/internals/data-flow.md). Keyboard, pointer, and handle
+// calls all feed it. Pure: no DOM. In-flight chips live in the world, not here, which is what
+// allows rapid fire.
 
 import type { HandlerMap } from './dispatch';
 

@@ -19,7 +19,7 @@ npx playwright install chromium   # once, for e2e tests
 | `npm run docs:build` | Build the docs site; fails on undocumented exports or dead links |
 | `npm run docs:examples` | Type-check the docs examples and framework recipes |
 
-Architecture is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Architecture is documented on the docs site, under Internals ([site/internals/](site/internals/)).
 
 ## Documentation
 

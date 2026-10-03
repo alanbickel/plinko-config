@@ -1,5 +1,5 @@
-// Board sizing (ARCHITECTURE.md §7): fill the host's width, but never be taller than the screen,
-// nor than the host if it has a height of its own. Centred when narrower than the host.
+// Board sizing (site/internals/sizing.md): fill the host's width, but never be taller than the
+// screen, nor than the host if it has a height of its own. Centred when narrower than the host.
 
 import type { BoardContext } from './context';
 

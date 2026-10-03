@@ -1,6 +1,6 @@
-// requestAnimationFrame + fixed-step accumulator (ARCHITECTURE.md §9). Sleeps when idle: no frames
-// are requested until wake(). Hidden tabs get no RAF callbacks anyway, and the clamp below stops a
-// burst of catch-up steps when the tab comes back.
+// requestAnimationFrame + fixed-step accumulator (site/internals/frame-loop.md). Sleeps when
+// idle: no frames are requested until wake(). Hidden tabs get no RAF callbacks anyway, and the
+// clamp below stops a burst of catch-up steps when the tab comes back.
 
 import { STEP } from '../core/world';
 

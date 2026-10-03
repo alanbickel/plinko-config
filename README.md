@@ -47,7 +47,7 @@ npm run check      # lint, typecheck, test, build, size
 npm run docs:dev   # docs site (run npm install in site/ first)
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the Internals section of the docs site ([site/internals/](site/internals/)).
 
 ## Credits
 

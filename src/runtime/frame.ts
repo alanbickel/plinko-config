@@ -15,7 +15,8 @@ export function createLoop(ctx: BoardContext): FrameLoop {
     },
     render: (alpha) => {
       if (ctx.reducedMotion) settleNow(ctx);
-      dispatchWorldEvents(ctx, handlers); // after stepping, never mid-step (ARCHITECTURE.md §9)
+      // After stepping, never mid-step (site/internals/frame-loop.md).
+      dispatchWorldEvents(ctx, handlers);
       ctx.view.render(frameState(ctx, alpha));
     },
     active: () => isAnimating(ctx),
