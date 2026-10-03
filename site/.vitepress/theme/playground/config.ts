@@ -83,20 +83,21 @@ export const DEFAULT_CONTROLS: ControlsDraft = {
 export function initialConfig(): PlaygroundConfig {
   return {
     slots: [
-      { id: 'email', label: 'Email', fill: '' },
-      { id: 'push', label: 'Push', fill: '' },
-      { id: 'sms', label: 'SMS', fill: '' },
-      { id: 'dark-mode', label: 'Dark mode', fill: '' },
-      { id: 'autoplay', label: 'Autoplay', fill: '' },
+      { id: 'product-alerts', label: 'Product Alerts', fill: '' },
+      { id: 'status-alerts', label: 'Status Alerts', fill: '' },
+      { id: 'sms-messages', label: 'SMS messages', fill: '' },
+      { id: 'dark-mode', label: 'Dark Mode', fill: '' },
+      { id: 'sell-my-data', label: 'Sell my data', fill: '' },
+      { id: 'light-mode', label: 'Light Mode', fill: '' },
     ],
     chips: [
       { id: 'on', label: 'On', count: 5, fill: '#3ec7a8' },
       { id: 'off', label: 'Off', count: 5, fill: '#e0607e' },
     ],
-    physics: { ...DEFAULT_PHYSICS },
+    physics: { ...DEFAULT_PHYSICS, maxSpeed: 8.5 },
     seed: null,
-    board: { ...DEFAULT_BOARD },
-    slotLabels: { ...DEFAULT_SLOT_LABELS },
+    board: { ...DEFAULT_BOARD, rows: 6, railWidth: 0.15 },
+    slotLabels: { ...DEFAULT_SLOT_LABELS, layout: 'angled' },
     controls: { ...DEFAULT_CONTROLS },
     supply: { refill: 'onRequest', everyMs: 3000, answer: 'grant' },
   };

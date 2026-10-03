@@ -25,7 +25,12 @@ const log = ref<LogEntry[]>([]);
 const transcript = ref<Announcement[]>([]);
 const paused = ref(false);
 const autoDrop = ref(false);
-const pane = ref<'log' | 'results' | 'transcript' | 'export'>('log');
+const TABS = [
+  { id: 'configure', label: 'Configure' },
+  { id: 'observe', label: 'Observe' },
+  { id: 'export', label: 'Export' },
+] as const;
+const tab = ref<(typeof TABS)[number]['id']>('configure');
 const copied = ref(false);
 /** Chips per slot id, then per chip id, since the board was last built. */
 const tally = ref<Record<string, Record<string, number>>>({});
@@ -122,26 +127,45 @@ const tint = (hex: string) => `${hex}40`;
 
 <template>
   <div class="playground">
-    <div class="toolbar">
-      <button type="button" @click="board?.reset()">Reset board</button>
-      <button type="button" :aria-pressed="paused" @click="paused = !paused">
-        {{ paused ? 'Resume' : 'Pause' }}
-      </button>
-      <button type="button" :aria-pressed="autoDrop" @click="autoDrop = !autoDrop">
-        Auto-drop {{ autoDrop ? 'on' : 'off' }}
-      </button>
-      <span class="hint">Drag a chip up into the glowing drop zone, or Tab to the board and use the keyboard.</span>
+    <div class="stage">
+      <div class="toolbar">
+        <button type="button" @click="board?.reset()">Reset board</button>
+        <button type="button" :aria-pressed="paused" @click="paused = !paused">
+          {{ paused ? 'Resume' : 'Pause' }}
+        </button>
+        <button type="button" :aria-pressed="autoDrop" @click="autoDrop = !autoDrop">
+          Auto-drop {{ autoDrop ? 'on' : 'off' }}
+        </button>
+      </div>
+      <div ref="host" class="host" />
+      <p v-if="error" class="error" role="alert">{{ error }} (the board keeps its last valid setup)</p>
+      <p class="hint">Drag a chip up into the glowing drop zone, or Tab to the board and use the keyboard.</p>
     </div>
 
-    <div class="main">
-      <div class="stage">
-        <div ref="host" class="host" />
-        <p v-if="error" class="error" role="alert">{{ error }} (the board keeps its last valid setup)</p>
+    <div class="panel">
+      <div class="tabs" role="tablist">
+        <button
+          v-for="t in TABS"
+          :id="`tab-${t.id}`"
+          :key="t.id"
+          type="button"
+          role="tab"
+          :aria-selected="tab === t.id"
+          :aria-controls="`panel-${t.id}`"
+          @click="tab = t.id"
+        >
+          {{ t.label }}
+        </button>
       </div>
 
-      <div class="controls">
+      <div v-show="tab === 'configure'" id="panel-configure" class="stack" role="tabpanel" aria-labelledby="tab-configure">
+        <p class="note">
+          <em>Live</em> changes can be applied at runtime by calling <code>update()</code>. <em>Remount</em> changes are
+          rejected by <code>update()</code> and require the board to be destroyed and re-mounted.
+        </p>
         <details open>
-          <summary>Content <small>rebuilds the board</small></summary>
+          <summary>Content <small>remount</small></summary>
+          <p class="note">Tints and colours are live.</p>
           <h4>Slots</h4>
           <div v-for="(slot, i) in config.slots" :key="slot.id" class="row">
             <input v-model="slot.label" :aria-label="`Slot ${i + 1} label`" />
@@ -190,7 +214,7 @@ const tint = (hex: string) => `${hex}40`;
         </details>
 
         <details>
-          <summary>Physics <small>rebuilds the board</small></summary>
+          <summary>Physics <small>remount</small></summary>
           <label v-for="s in PHYSICS_SLIDERS" :key="s.key" class="slider" :title="s.hint">
             <span>{{ s.label }} <output>{{ config.physics[s.key] }}</output></span>
             <input v-model.number="config.physics[s.key]" type="range" :min="s.min" :max="s.max" :step="s.step" />
@@ -208,7 +232,7 @@ const tint = (hex: string) => `${hex}40`;
         </details>
 
         <details>
-          <summary>Board shape <small>rebuilds the board</small></summary>
+          <summary>Board shape <small>remount</small></summary>
           <label v-for="s in BOARD_SLIDERS" :key="s.key" class="slider" :title="s.hint">
             <span>{{ s.label }} <output>{{ config.board[s.key] }}</output></span>
             <input v-model.number="config.board[s.key]" type="range" :min="s.min" :max="s.max" :step="s.step" />
@@ -248,11 +272,11 @@ const tint = (hex: string) => `${hex}40`;
               <option v-for="m in MOTION_CHOICES" :key="m" :value="m">{{ m }}</option>
             </select>
           </label>
-          <label class="check"><input v-model="config.controls.attribution" type="checkbox" /> “Powered by LittleJS” link (rebuilds)</label>
+          <label class="check"><input v-model="config.controls.attribution" type="checkbox" /> “Powered by LittleJS” link <em class="aside">remount</em></label>
         </details>
 
         <details>
-          <summary>Supply <small>rebuilds the board</small></summary>
+          <summary>Supply <small>remount</small></summary>
           <label class="field">
             When chips run out
             <select v-model="config.supply.refill">
@@ -274,48 +298,50 @@ const tint = (hex: string) => `${hex}40`;
           </label>
         </details>
       </div>
-    </div>
 
-    <div class="panes">
-      <div class="tabs" role="tablist">
-        <button type="button" role="tab" :aria-selected="pane === 'log'" @click="pane = 'log'">Callbacks</button>
-        <button type="button" role="tab" :aria-selected="pane === 'results'" @click="pane = 'results'">Results</button>
-        <button type="button" role="tab" :aria-selected="pane === 'transcript'" @click="pane = 'transcript'">Screen reader</button>
-        <button type="button" role="tab" :aria-selected="pane === 'export'" @click="pane = 'export'">Export config</button>
-      </div>
-      <ol v-if="pane === 'log'" class="log" role="tabpanel">
-        <li v-if="log.length === 0" class="empty">Play a chip to see callbacks here.</li>
-        <li v-for="(entry, i) in log" :key="log.length - i">
-          <time>{{ seconds(entry.at) }}s</time> <code>{{ entry.callback }}</code> {{ entry.text }}
-        </li>
-      </ol>
-      <div v-else-if="pane === 'results'" class="results" role="tabpanel">
-        <p v-if="histogram.landed + missed === 0" class="empty">Drop chips (or turn on Auto-drop) to see where they land.</p>
-        <p v-else>{{ histogram.landed }} landed, {{ missed }} missed</p>
-        <ol class="histogram">
-          <li v-for="column in histogram.columns" :key="column.slot.id">
-            <span class="total">{{ column.total }}</span>
-            <span class="track">
-              <span class="bar" :style="{ height: `${(column.total / histogram.max) * 100}%` }">
-                <span
-                  v-for="segment in column.segments"
-                  :key="segment.chip.id"
-                  :style="{ background: segment.chip.fill, flexGrow: segment.count }"
-                  :title="`${segment.chip.label}: ${segment.count}`"
-                />
+      <div v-show="tab === 'observe'" id="panel-observe" class="stack" role="tabpanel" aria-labelledby="tab-observe">
+        <details open>
+          <summary>Results</summary>
+          <p v-if="histogram.landed + missed === 0" class="empty">Drop chips (or turn on Auto-drop) to see where they land.</p>
+          <p v-else class="tally">{{ histogram.landed }} landed, {{ missed }} missed</p>
+          <ol class="histogram">
+            <li v-for="column in histogram.columns" :key="column.slot.id">
+              <span class="total">{{ column.total }}</span>
+              <span class="track">
+                <span class="bar" :style="{ height: `${(column.total / histogram.max) * 100}%` }">
+                  <span
+                    v-for="segment in column.segments"
+                    :key="segment.chip.id"
+                    :style="{ background: segment.chip.fill, flexGrow: segment.count }"
+                    :title="`${segment.chip.label}: ${segment.count}`"
+                  />
+                </span>
               </span>
-            </span>
-            <span class="label" :title="column.slot.label">{{ column.slot.label }}</span>
-          </li>
-        </ol>
+              <span class="label" :title="column.slot.label">{{ column.slot.label }}</span>
+            </li>
+          </ol>
+        </details>
+        <details>
+          <summary>Callbacks</summary>
+          <ol class="log">
+            <li v-if="log.length === 0" class="empty">Play a chip to see callbacks here.</li>
+            <li v-for="(entry, i) in log" :key="log.length - i">
+              <time>{{ seconds(entry.at) }}s</time> <code>{{ entry.callback }}</code> {{ entry.text }}
+            </li>
+          </ol>
+        </details>
+        <details>
+          <summary>Screen reader</summary>
+          <ol class="log">
+            <li v-if="transcript.length === 0" class="empty">Pick up or drop a chip to see what a screen reader announces.</li>
+            <li v-for="(entry, i) in transcript" :key="transcript.length - i">
+              <time>{{ seconds(entry.at) }}s</time> {{ entry.text }}
+            </li>
+          </ol>
+        </details>
       </div>
-      <ol v-else-if="pane === 'transcript'" class="log" role="tabpanel">
-        <li v-if="transcript.length === 0" class="empty">Pick up or drop a chip to see what a screen reader announces.</li>
-        <li v-for="(entry, i) in transcript" :key="transcript.length - i">
-          <time>{{ seconds(entry.at) }}s</time> {{ entry.text }}
-        </li>
-      </ol>
-      <div v-else class="export" role="tabpanel">
+
+      <div v-show="tab === 'export'" id="panel-export" class="export" role="tabpanel" aria-labelledby="tab-export">
         <button type="button" class="copy" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
         <pre><code>{{ code }}</code></pre>
       </div>
@@ -325,21 +351,52 @@ const tint = (hex: string) => `${hex}40`;
 
 <style scoped>
 .playground {
+  align-items: start;
   display: grid;
-  gap: 16px;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   margin: 0 auto;
   max-width: 1200px;
   padding: 24px;
 }
+/* The board stays in view while the panel scrolls (two-column layout only). */
+.stage {
+  display: grid;
+  gap: 8px;
+  position: sticky;
+  top: calc(var(--vp-nav-height) + 16px);
+}
 .toolbar {
-  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: center;
 }
-.toolbar .hint {
+.hint,
+.note {
   color: var(--vp-c-text-2);
   font-size: 13px;
+  margin: 0;
+}
+.hint {
+  text-align: center;
+}
+.note {
+  font-style: italic;
+}
+.note em {
+  font-style: normal;
+  font-weight: 600;
+}
+.note code {
+  font-size: 12px;
+}
+details .note {
+  margin-top: 8px;
+}
+.aside {
+  color: var(--vp-c-text-3);
+  font-size: 12px;
 }
 button {
   background: var(--vp-c-default-soft);
@@ -358,11 +415,6 @@ button[aria-selected='true'] {
   background: var(--vp-c-brand-soft);
   color: var(--vp-c-brand-1);
 }
-.main {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1fr) 320px;
-}
 .host {
   height: min(72vh, 680px);
 }
@@ -370,7 +422,7 @@ button[aria-selected='true'] {
   color: var(--vp-c-danger-1);
   font-size: 14px;
 }
-.controls {
+.stack {
   display: grid;
   gap: 8px;
   align-content: start;
@@ -455,39 +507,29 @@ input[type='color'] {
   gap: 4px;
   margin-bottom: 8px;
 }
-.log,
-.export pre {
-  background: var(--vp-c-bg-soft);
-  border-radius: 8px;
+.log {
   font-size: 13px;
+  list-style: none;
+  margin: 8px 0 4px;
   max-height: 280px;
   overflow: auto;
-  padding: 12px;
-}
-.log {
-  list-style: none;
+  padding: 0;
 }
 .log time {
   color: var(--vp-c-text-3);
   font-variant-numeric: tabular-nums;
 }
-.log .empty {
-  color: var(--vp-c-text-3);
-}
-.results {
-  background: var(--vp-c-bg-soft);
-  border-radius: 8px;
+.empty,
+.tally {
   font-size: 13px;
-  padding: 12px;
+  margin: 8px 0;
 }
-.results p {
-  margin: 0 0 8px;
-}
-.results .empty {
+.empty {
   color: var(--vp-c-text-3);
 }
 .histogram {
   display: flex;
+  font-size: 13px;
   gap: 6px;
   list-style: none;
   margin: 0;
@@ -523,20 +565,27 @@ input[type='color'] {
   white-space: nowrap;
 }
 .export {
-  position: relative;
+  display: grid;
+  gap: 8px;
 }
 .export pre {
-  max-height: 420px;
+  background: var(--vp-c-bg-soft);
+  border-radius: 8px;
+  font-size: 13px;
   margin: 0;
+  max-height: min(72vh, 680px);
+  overflow: auto;
+  padding: 12px;
 }
 .copy {
-  position: absolute;
-  right: 8px;
-  top: 8px;
+  justify-self: end;
 }
 @media (max-width: 860px) {
-  .main {
+  .playground {
     grid-template-columns: 1fr;
+  }
+  .stage {
+    position: static;
   }
   .host {
     height: 70vh;
