@@ -9,10 +9,16 @@ import {
   LIGHT_THEME,
   type PlaygroundConfig,
 } from './config';
+import { labelsSource } from './labels';
 
-type Literal = string | number | boolean | Literal[] | LiteralObject;
+type Literal = string | number | boolean | Literal[] | LiteralObject | Code;
 interface LiteralObject {
   [key: string]: Literal;
+}
+
+/** Source code to print as is, such as an arrow function. */
+class Code {
+  constructor(readonly source: string) {}
 }
 
 /** Keys of `actual` whose values differ from `defaults`. */
@@ -32,6 +38,14 @@ function compact(object: Record<string, unknown>): LiteralObject {
 
 function styleEntries(items: readonly { id: string; fill: string }[]): LiteralObject {
   return Object.fromEntries(items.filter((i) => i.fill).map((i) => [i.id, { fill: i.fill }]));
+}
+
+function labelsLiteral(config: PlaygroundConfig): LiteralObject {
+  const entries = labelsSource(config.labels).map(({ key, value, isCode }) => [
+    key,
+    isCode ? new Code(value) : value,
+  ]);
+  return Object.fromEntries(entries);
 }
 
 function supplyLiteral(config: PlaygroundConfig): LiteralObject | undefined {
@@ -58,6 +72,7 @@ function optionsLiteral(config: PlaygroundConfig): LiteralObject {
     ...compact(changed(config.controls, DEFAULT_CONTROLS)),
     theme: config.theme === 'light' ? { ...LIGHT_THEME } : undefined,
     styles: compact({ slots: styleEntries(config.slots), chips: styleEntries(config.chips) }),
+    labels: labelsLiteral(config),
   });
 }
 
@@ -81,6 +96,7 @@ interface Bracketed {
 function literal(value: Literal, depth: number): string {
   if (typeof value === 'string') return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
   if (typeof value !== 'object') return String(value);
+  if (value instanceof Code) return value.source;
   if (Array.isArray(value)) {
     const items = value.map((v) => literal(v, depth + 1));
     return bracket({ items, open: '[', close: ']', depth });

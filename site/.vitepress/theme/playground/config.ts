@@ -17,6 +17,7 @@ import {
   type Styles,
   type Theme,
 } from '../../../../src/index';
+import { type LabelDrafts, labelsOption } from './labels';
 
 export { DEFAULT_BOARD, DEFAULT_PHYSICS, DEFAULT_SLOT_LABELS };
 
@@ -51,7 +52,6 @@ export interface ControlsDraft {
   /** Null for unlimited. */
   maxInFlight: number | null;
   motion: MotionPreference;
-  attribution: boolean;
   /** Null for the library's default. */
   aimStep: number | null;
   aimStepLarge: number | null;
@@ -90,13 +90,13 @@ export interface PlaygroundConfig {
   slotLabels: Required<SlotLabelOptions>;
   controls: ControlsDraft;
   supply: SupplyDraft;
+  labels: LabelDrafts;
 }
 
 export const DEFAULT_CONTROLS: ControlsDraft = {
   autoReload: true,
   maxInFlight: null,
   motion: 'auto',
-  attribution: true,
   aimStep: null,
   aimStepLarge: null,
   liftStep: null,
@@ -124,6 +124,7 @@ export function initialConfig(theme: ThemeChoice): PlaygroundConfig {
     slotLabels: { ...DEFAULT_SLOT_LABELS, layout: 'angled' },
     controls: { ...DEFAULT_CONTROLS },
     supply: { refill: 'onRequest', everyMs: 3000, answer: 'grant' },
+    labels: {},
   };
 }
 
@@ -136,7 +137,6 @@ export function mountOptions(config: PlaygroundConfig): Partial<PlinkoOptions> {
     physics:
       config.seed === null ? { ...config.physics } : { ...config.physics, seed: config.seed },
     supply: { refill: refillPolicy(config.supply) },
-    attribution: config.controls.attribution,
   };
 }
 
@@ -155,6 +155,7 @@ export function liveOptions(config: PlaygroundConfig): BoardUpdate {
     theme: config.theme === 'light' ? LIGHT_THEME : DEFAULT_THEME,
     styles: styles(config),
     slotLabels: { ...config.slotLabels },
+    labels: labelsOption(config.labels),
   };
 }
 

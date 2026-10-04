@@ -18,6 +18,13 @@ import {
   STEP_SLIDERS,
 } from './controls';
 import { exportConfig } from './export';
+import { ANNOUNCED, BOARD_TEXT, defaultText, type LabelSpec } from './labels';
+
+const LABEL_GROUPS = [
+  { title: 'Announced', name: 'Event name', specs: ANNOUNCED },
+  { title: 'Board and tray', name: 'Name', specs: BOARD_TEXT },
+];
+const tokenList = (spec: LabelSpec) => spec.tokens.map((t) => `{${t}}`).join(' ');
 
 // biome-ignore lint/correctness/useHookAtTopLevel: a React rule; <script setup> is setup()
 const { isDark } = useData();
@@ -194,25 +201,16 @@ const tint = (hex: string) => `${hex}40`;
 
       <div v-show="tab === 'configure'" id="panel-configure" class="stack" role="tabpanel" aria-labelledby="tab-configure">
         <details open>
-          <summary>Content <small>remount</small></summary>
-          <p class="note">Tints and colours are live.</p>
-          <h4>Slots</h4>
-          <div v-for="(slot, i) in config.slots" :key="slot.id" class="row">
-            <input v-model="slot.label" :aria-label="`Slot ${i + 1} label`" />
-            <template v-if="slot.fill">
-              <input
-                :value="slot.fill.slice(0, 7)"
-                type="color"
-                :aria-label="`${slot.label} tint`"
-                @input="slot.fill = tint(($event.target as HTMLInputElement).value)"
-              />
-              <button type="button" class="link" :aria-label="`Remove ${slot.label} tint`" @click="slot.fill = ''">no tint</button>
-            </template>
-            <button v-else type="button" class="link" :aria-label="`Tint ${slot.label}`" @click="slot.fill = tint(DEFAULT_TINT)">+ tint</button>
-            <button type="button" :disabled="config.slots.length <= 1" :aria-label="`Remove slot ${slot.label}`" @click="config.slots.splice(i, 1)">×</button>
-          </div>
-          <button type="button" class="add" :disabled="config.slots.length >= 12" @click="addSlot">+ Slot</button>
-          <h4>Chips</h4>
+          <summary>Board shape <small>remount</small></summary>
+          <label v-for="s in BOARD_SLIDERS" :key="s.key" class="slider" :title="s.hint">
+            <span>{{ s.label }} <output>{{ config.board[s.key] }}</output></span>
+            <input v-model.number="config.board[s.key]" type="range" :min="s.min" :max="s.max" :step="s.step" />
+          </label>
+        </details>
+
+        <details>
+          <summary>Chips <small>remount</small></summary>
+          <p class="note">Colours are live.</p>
           <div v-for="(chip, i) in config.chips" :key="chip.id" class="row">
             <input v-model="chip.label" :aria-label="`Chip ${i + 1} label`" />
             <input
@@ -231,29 +229,58 @@ const tint = (hex: string) => `${hex}40`;
         </details>
 
         <details>
-          <summary>Theme <small>live</small></summary>
-          <p class="note">Starts with the page's theme and follows its toggle.</p>
-          <label class="field">
-            Colours
-            <select v-model="config.theme">
-              <option value="dark">Dark (library default)</option>
-              <option value="light">Light</option>
-            </select>
-          </label>
+          <summary>Event messages <small>live</small></summary>
+          <p class="note">
+            Overrides the event messages dispatched by the component. Default messages are used for any event that you
+            haven't customized. Each event lists the template strings it supports.
+          </p>
+          <template v-for="group in LABEL_GROUPS" :key="group.title">
+            <h4>{{ group.title }}</h4>
+            <label v-for="spec in group.specs" :key="spec.key" class="field">
+              <span class="label-name">
+                {{ group.name }}: <code>{{ spec.key }}</code> ({{ spec.hint }})
+                <template v-if="spec.tokens.length">
+                  <br />Supported template strings: <code>{{ tokenList(spec) }}</code>
+                </template>
+              </span>
+              <input v-model="config.labels[spec.key]" :placeholder="defaultText(spec)" />
+            </label>
+          </template>
         </details>
 
         <details>
-          <summary>Slot labels <small>live</small></summary>
+          <summary>Motion and key controls <small>live</small></summary>
+          <label v-for="s in STEP_SLIDERS" :key="s.key" class="slider" :title="s.hint">
+            <span>
+              {{ s.label }} <output>{{ config.controls[s.key] ?? 'default' }}</output>
+              <button v-if="config.controls[s.key] !== null" type="button" class="link" @click.prevent="setOptional(s.key, null)">reset</button>
+            </span>
+            <input
+              :value="config.controls[s.key] ?? 0.25"
+              type="range"
+              :min="s.min"
+              :max="s.max"
+              :step="s.step"
+              @input="setOptional(s.key, ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+          <label class="check"><input v-model="config.controls.autoReload" type="checkbox" /> Pick up another chip after a keyboard drop</label>
           <label class="field">
-            Layout
-            <select v-model="config.slotLabels.layout">
-              <option v-for="l in LABEL_LAYOUTS" :key="l.value" :value="l.value">{{ l.label }}</option>
+            Concurrent chips in play
+            <input
+              :value="config.controls.maxInFlight ?? ''"
+              type="number"
+              min="1"
+              placeholder="∞"
+              @change="setOptional('maxInFlight', ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+          <label class="field">
+            Motion
+            <select v-model="config.controls.motion">
+              <option v-for="m in MOTION_CHOICES" :key="m" :value="m">{{ m }}</option>
             </select>
-          </label>
-          <label v-if="config.slotLabels.layout === 'vertical' || config.slotLabels.layout === 'angled'" class="check">
-            <input v-model="config.slotLabels.horizontalWhenFit" type="checkbox" /> Stay horizontal when every label fits
-          </label>
-        </details>
+          </label>        </details>
 
         <details>
           <summary>Physics <small>remount</small></summary>
@@ -274,47 +301,33 @@ const tint = (hex: string) => `${hex}40`;
         </details>
 
         <details>
-          <summary>Board shape <small>remount</small></summary>
-          <label v-for="s in BOARD_SLIDERS" :key="s.key" class="slider" :title="s.hint">
-            <span>{{ s.label }} <output>{{ config.board[s.key] }}</output></span>
-            <input v-model.number="config.board[s.key]" type="range" :min="s.min" :max="s.max" :step="s.step" />
-          </label>
-        </details>
-
-        <details>
-          <summary>Controls <small>live</small></summary>
-          <label v-for="s in STEP_SLIDERS" :key="s.key" class="slider" :title="s.hint">
-            <span>
-              {{ s.label }} <output>{{ config.controls[s.key] ?? 'default' }}</output>
-              <button v-if="config.controls[s.key] !== null" type="button" class="link" @click.prevent="setOptional(s.key, null)">reset</button>
-            </span>
-            <input
-              :value="config.controls[s.key] ?? 0.25"
-              type="range"
-              :min="s.min"
-              :max="s.max"
-              :step="s.step"
-              @input="setOptional(s.key, ($event.target as HTMLInputElement).value)"
-            />
-          </label>
-          <label class="check"><input v-model="config.controls.autoReload" type="checkbox" /> Pick up another chip after a keyboard drop</label>
+          <summary>Slots <small>remount</small></summary>
+          <p class="note">Tints and the label layout are live.</p>
+          <div v-for="(slot, i) in config.slots" :key="slot.id" class="row">
+            <input v-model="slot.label" :aria-label="`Slot ${i + 1} label`" />
+            <template v-if="slot.fill">
+              <input
+                :value="slot.fill.slice(0, 7)"
+                type="color"
+                :aria-label="`${slot.label} tint`"
+                @input="slot.fill = tint(($event.target as HTMLInputElement).value)"
+              />
+              <button type="button" class="link" :aria-label="`Remove ${slot.label} tint`" @click="slot.fill = ''">no tint</button>
+            </template>
+            <button v-else type="button" class="link" :aria-label="`Tint ${slot.label}`" @click="slot.fill = tint(DEFAULT_TINT)">+ tint</button>
+            <button type="button" :disabled="config.slots.length <= 1" :aria-label="`Remove slot ${slot.label}`" @click="config.slots.splice(i, 1)">×</button>
+          </div>
+          <button type="button" class="add" :disabled="config.slots.length >= 12" @click="addSlot">+ Slot</button>
+          <h4>Label layout</h4>
           <label class="field">
-            Chips in the air at once
-            <input
-              :value="config.controls.maxInFlight ?? ''"
-              type="number"
-              min="1"
-              placeholder="∞"
-              @change="setOptional('maxInFlight', ($event.target as HTMLInputElement).value)"
-            />
-          </label>
-          <label class="field">
-            Motion
-            <select v-model="config.controls.motion">
-              <option v-for="m in MOTION_CHOICES" :key="m" :value="m">{{ m }}</option>
+            Layout
+            <select v-model="config.slotLabels.layout">
+              <option v-for="l in LABEL_LAYOUTS" :key="l.value" :value="l.value">{{ l.label }}</option>
             </select>
           </label>
-          <label class="check"><input v-model="config.controls.attribution" type="checkbox" /> “Powered by LittleJS” link <em class="aside">remount</em></label>
+          <label v-if="config.slotLabels.layout === 'vertical' || config.slotLabels.layout === 'angled'" class="check">
+            <input v-model="config.slotLabels.horizontalWhenFit" type="checkbox" /> Stay horizontal when every label fits
+          </label>
         </details>
 
         <details>
@@ -336,6 +349,18 @@ const tint = (hex: string) => `${hex}40`;
               <option value="grant">granted</option>
               <option value="deny">denied</option>
               <option value="slow">granted after 2 s</option>
+            </select>
+          </label>
+        </details>
+
+        <details>
+          <summary>Theme <small>live</small></summary>
+          <p class="note">Starts with the page's theme and follows its toggle.</p>
+          <label class="field">
+            Colours
+            <select v-model="config.theme">
+              <option value="dark">Dark (library default)</option>
+              <option value="light">Light</option>
             </select>
           </label>
         </details>
@@ -455,10 +480,6 @@ const tint = (hex: string) => `${hex}40`;
 details .note {
   margin-top: 8px;
 }
-.aside {
-  color: var(--vp-c-text-3);
-  font-size: 12px;
-}
 button {
   background: var(--vp-c-default-soft);
   border-radius: 6px;
@@ -551,6 +572,14 @@ input[type='color'] {
 }
 .field {
   gap: 2px;
+}
+.label-name {
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+}
+.label-name code {
+  color: var(--vp-c-text-1);
+  font-size: 12px;
 }
 .check {
   align-items: center;
