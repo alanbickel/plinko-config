@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { PlinkoConfigError } from '../core/validate';
 import { definePlinkoBoard, PlinkoBoardElement } from './element';
-import type { PlinkoOptions } from './types';
+import type { ChipDetails, PlinkoOptions } from './types';
 
 const options = (extra: Partial<PlinkoOptions> = {}): PlinkoOptions => ({
   slots: [
@@ -123,5 +123,34 @@ describe('events', () => {
     el.options = options({ onDrop: vi.fn() });
     void el.board?.drop({ chip: 'on' });
     expect(heard).toHaveBeenCalledOnce();
+  });
+
+  it('types listener details from the element’s chip and slot value types', () => {
+    const typed = el as PlinkoBoardElement<boolean, 'a' | 'b'>;
+    typed.options = {
+      slots: [
+        { id: 'a', label: 'A', value: 'a' },
+        { id: 'b', label: 'B', value: 'b' },
+      ],
+      chips: [{ id: 'on', label: 'On', value: true }],
+      physics: { seed: 1 },
+    };
+    const values: boolean[] = [];
+    const onPickUp = (event: CustomEvent<ChipDetails<boolean>>) => {
+      if (event.detail.chip.value !== undefined) values.push(event.detail.chip.value);
+    };
+    typed.addEventListener('plinko-land', (event) => {
+      expectTypeOf(event.detail.chip.value).toEqualTypeOf<boolean | undefined>();
+      expectTypeOf(event.detail.slot.value).toEqualTypeOf<'a' | 'b' | undefined>();
+    });
+    typed.addEventListener('keydown', (event) =>
+      expectTypeOf(event).toEqualTypeOf<KeyboardEvent>(),
+    );
+    typed.addEventListener('plinko-pick-up', onPickUp);
+    document.body.append(typed);
+    typed.board?.pickUp('on');
+    typed.removeEventListener('plinko-pick-up', onPickUp);
+    typed.board?.pickUp('on');
+    expect(values).toEqual([true]);
   });
 });

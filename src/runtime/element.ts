@@ -36,25 +36,28 @@ type EventCallback = keyof typeof EVENTS;
  * its `detail` is the object that callback receives. All of them bubble and cross shadow DOM
  * boundaries (`composed`), so you can listen on the element or any ancestor.
  *
+ * `CV` and `SV` are the chip and slot value types, as in {@link PlinkoOptions}. Listeners added on
+ * the element get these events typed; see {@link PlinkoBoardElement}.
+ *
  * @example
  * ```ts
  * board.addEventListener('plinko-land', (event) => {
- *   const { chip, slot } = (event as PlinkoBoardEventMap['plinko-land']).detail;
+ *   const { chip, slot } = event.detail;
  *   savePreference(slot.id, chip.value);
  * });
  * ```
  */
-export interface PlinkoBoardEventMap {
+export interface PlinkoBoardEventMap<CV = unknown, SV = unknown> {
   /** A chip was picked up from the tray. Mirrors {@link PlinkoOptions.onPickUp}. */
-  'plinko-pick-up': CustomEvent<ChipDetails>;
+  'plinko-pick-up': CustomEvent<ChipDetails<CV>>;
   /** A chip was dropped from the drop zone and is falling. Mirrors {@link PlinkoOptions.onDrop}. */
-  'plinko-drop': CustomEvent<DropDetails>;
+  'plinko-drop': CustomEvent<DropDetails<CV>>;
   /** A falling chip hit a peg. Mirrors {@link PlinkoOptions.onPegHit}. */
-  'plinko-peg-hit': CustomEvent<PegHitDetails>;
+  'plinko-peg-hit': CustomEvent<PegHitDetails<CV>>;
   /** A chip came to rest in a slot. Mirrors {@link PlinkoOptions.onLand}. */
-  'plinko-land': CustomEvent<LandDetails>;
+  'plinko-land': CustomEvent<LandDetails<CV, SV>>;
   /** A chip came to rest without reaching a slot. Mirrors {@link PlinkoOptions.onMiss}. */
-  'plinko-miss': CustomEvent<MissDetails>;
+  'plinko-miss': CustomEvent<MissDetails<CV>>;
   /** The board filled up and locked. Fires once. Mirrors {@link PlinkoOptions.onFull}. */
   'plinko-full': CustomEvent<FullDetails>;
   /** Chip counts changed. Mirrors {@link PlinkoOptions.onSupplyChange}. */
@@ -63,17 +66,21 @@ export interface PlinkoBoardEventMap {
    * The last chip of a kind was used up (dropped, or lost off the board). Mirrors
    * {@link PlinkoOptions.onExhausted}.
    */
-  'plinko-exhausted': CustomEvent<ChipDetails>;
+  'plinko-exhausted': CustomEvent<ChipDetails<CV>>;
 }
 
-// Compile-time guard: the written-out map above must match EVENTS and the callback types exactly.
-type DerivedEventMap = {
+// Compile-time guard: the written-out map above must match EVENTS and the callback types exactly,
+// including where the chip and slot value types go.
+type DerivedEventMap<CV, SV> = {
   [K in EventCallback as (typeof EVENTS)[K]]: CustomEvent<
-    Parameters<NonNullable<PlinkoOptions[K]>>[0]
+    Parameters<NonNullable<PlinkoOptions<CV, SV>[K]>>[0]
   >;
 };
 type MutuallyAssignable<A, B> = [A, B] extends [B, A] ? true : false;
-const EVENT_MAP_MATCHES: MutuallyAssignable<PlinkoBoardEventMap, DerivedEventMap> = true;
+const EVENT_MAP_MATCHES: MutuallyAssignable<
+  PlinkoBoardEventMap<'cv', 'sv'>,
+  DerivedEventMap<'cv', 'sv'>
+> = true;
 void EVENT_MAP_MATCHES;
 
 const MOUNT_ONLY: readonly MountOnlyOption[] = [
@@ -98,18 +105,24 @@ const BaseElement = (globalThis.HTMLElement ?? class {}) as typeof HTMLElement;
  * element is removed. Changing `options` updates the live board, or remounts it if a mount-only
  * option changed. Every callback is also fired as a DOM event; see {@link PlinkoBoardEventMap}.
  *
+ * `CV` and `SV` are the chip and slot value types, as in {@link PlinkoOptions}. Name them when you
+ * look the element up, and `addEventListener` types each event's `detail` to match.
+ *
  * @example
  * ```ts
  * import 'plinko-config/element';
+ * import type { PlinkoBoardElement } from 'plinko-config/element';
  *
- * const el = document.querySelector('plinko-board')!;
+ * const el = document.querySelector<PlinkoBoardElement<boolean, string>>('plinko-board')!;
  * el.options = { slots, chips };
- * el.addEventListener('plinko-land', (event) => console.log(event));
+ * el.addEventListener('plinko-land', (event) => {
+ *   const { chip, slot } = event.detail; // chip.value: boolean, slot.value: string
+ * });
  * ```
  */
-export class PlinkoBoardElement extends BaseElement {
-  private config: PlinkoOptions | undefined;
-  private current: PlinkoBoard | undefined;
+export class PlinkoBoardElement<CV = unknown, SV = unknown> extends BaseElement {
+  private config: PlinkoOptions<CV, SV> | undefined;
+  private current: PlinkoBoard<CV, SV> | undefined;
   private readonly mountPoint: HTMLDivElement;
 
   constructor() {
@@ -122,20 +135,70 @@ export class PlinkoBoardElement extends BaseElement {
   }
 
   /** The board's options. Setting them updates the live board, or remounts it if needed. */
-  get options(): PlinkoOptions | undefined {
+  get options(): PlinkoOptions<CV, SV> | undefined {
     return this.config;
   }
 
   /** Setting `undefined` destroys the board. */
-  set options(next: PlinkoOptions | undefined) {
+  set options(next: PlinkoOptions<CV, SV> | undefined) {
     const previous = this.config;
     this.config = next;
     this.apply(previous);
   }
 
   /** The live board's handle (drop(), supply, …); undefined while not mounted. */
-  get board(): PlinkoBoard | undefined {
+  get board(): PlinkoBoard<CV, SV> | undefined {
     return this.current;
+  }
+
+  /** Listens for a `plinko-*` event, typed from {@link PlinkoBoardEventMap}, or any DOM event. */
+  override addEventListener<K extends keyof PlinkoBoardEventMap>(
+    type: K,
+    listener: (this: this, event: PlinkoBoardEventMap<CV, SV>[K]) => unknown,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  override addEventListener<K extends keyof HTMLElementEventMap>(
+    type: K,
+    listener: (this: this, event: HTMLElementEventMap[K]) => unknown,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  override addEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  // biome-ignore lint/complexity/useMaxParams: the DOM's signature, which this only narrows
+  override addEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions,
+  ): void {
+    super.addEventListener(type, listener, options);
+  }
+
+  /** Removes a listener added with `addEventListener`. */
+  override removeEventListener<K extends keyof PlinkoBoardEventMap>(
+    type: K,
+    listener: (this: this, event: PlinkoBoardEventMap<CV, SV>[K]) => unknown,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  override removeEventListener<K extends keyof HTMLElementEventMap>(
+    type: K,
+    listener: (this: this, event: HTMLElementEventMap[K]) => unknown,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  override removeEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  // biome-ignore lint/complexity/useMaxParams: the DOM's signature, which this only narrows
+  override removeEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | EventListenerOptions,
+  ): void {
+    super.removeEventListener(type, listener, options);
   }
 
   /** Called by the browser when the element is added to a document: mounts the board. */
@@ -149,7 +212,7 @@ export class PlinkoBoardElement extends BaseElement {
   }
 
   /** Mount, remount, or update, whichever the change needs. */
-  private apply(previous: PlinkoOptions | undefined): void {
+  private apply(previous: PlinkoOptions<CV, SV> | undefined): void {
     if (!this.config || !this.isConnected) {
       this.unmount();
       return;
@@ -172,19 +235,25 @@ export class PlinkoBoardElement extends BaseElement {
  * Compared by value, not identity: frameworks often rebuild the options object on every render,
  * and a remount would empty the piles each time.
  */
-function mountOnlyChanged(previous: PlinkoOptions, next: PlinkoOptions): boolean {
+function mountOnlyChanged<CV, SV>(
+  previous: PlinkoOptions<CV, SV>,
+  next: PlinkoOptions<CV, SV>,
+): boolean {
   return MOUNT_ONLY.some((key) => JSON.stringify(previous[key]) !== JSON.stringify(next[key]));
 }
 
-function liveOptions(options: PlinkoOptions): PlinkoOptions {
+function liveOptions<CV, SV>(options: PlinkoOptions<CV, SV>): PlinkoOptions<CV, SV> {
   const live = { ...options };
   for (const key of MOUNT_ONLY) delete live[key];
   return live;
 }
 
 /** Wraps each callback so it also fires its event. The host's own callback still runs. */
-function withEvents(element: HTMLElement, options: PlinkoOptions): PlinkoOptions {
-  const wrapped: PlinkoOptions = { ...options };
+function withEvents<CV, SV>(
+  element: HTMLElement,
+  options: PlinkoOptions<CV, SV>,
+): PlinkoOptions<CV, SV> {
+  const wrapped: PlinkoOptions<CV, SV> = { ...options };
   for (const [callback, type] of Object.entries(EVENTS) as [EventCallback, string][]) {
     const own = options[callback] as ((details: unknown) => void) | undefined;
     const fire = (details: unknown) => {
