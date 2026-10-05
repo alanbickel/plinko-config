@@ -67,6 +67,8 @@ export default withMermaid({
     "Drive your app's settings with Plinko. A delightfully sinister, accessible, framework-agnostic UI component with zero runtime dependencies.",
   base: '/plinko-config/',
   cleanUrls: true,
+  // head entries bypass `base`, so the path includes it.
+  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/plinko-config/favicon.svg' }]],
   // Mermaid's default is 14px; match the page's body text.
   mermaid: { themeVariables: { fontSize: '16px' } },
   themeConfig: {
