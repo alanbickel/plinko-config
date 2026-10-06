@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>plinko-config: e2e harness</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 1rem;
+        font: 14px/1.4 system-ui, sans-serif;
+      }
+      /* A host with its own height: the board fits inside it, width and height. */
+      #host.fixed {
+        height: calc(100vh - 2rem);
+      }
+      /* Logs the specs read; kept out of the way of the board. */
+      .logs {
+        position: absolute;
+        left: -10000px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- E2E harness, not a demo: specs mount the built package (dist/) through window.harness. -->
+    <div id="host"></div>
+    <div class="logs" aria-hidden="true">
+      <ol id="log"></ol>
+      <ol id="transcript"></ol>
+      <ol id="events"></ol>
+    </div>
+    <script type="module" src="./harness.ts"></script>
+  </body>
+</html>

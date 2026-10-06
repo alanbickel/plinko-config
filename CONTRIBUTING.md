@@ -6,14 +6,14 @@ Node 22 or later.
 
 ```sh
 npm install
-npx playwright install chromium   # once, for e2e tests
+npx playwright install chromium webkit   # once, for e2e tests
 ```
 
 | Command | What it does |
 |---|---|
 | `npm run dev` | Demo pages: `/` (showcase), `/debug.html` (physics), `/runtime.html` (runtime) |
 | `npm run check` | Lint, typecheck, unit tests, build, size budget |
-| `npm run test:e2e` | Playwright suite in `e2e/` |
+| `npm run test:e2e` | Build, then run the Playwright suite in `e2e/` against `dist/` (desktop and Android Chromium, iPhone and iPad WebKit) |
 | `npm run sim -- --drops 5000 --x 0.5` | Headless physics simulation (options in `scripts/simulate.ts`) |
 | `npm run docs:dev` | Docs site with live reload (run `npm install` in `site/` once first) |
 | `npm run docs:build` | Build the docs site; fails on undocumented exports or dead links |
@@ -176,7 +176,7 @@ type WorldEvent = LandedEvent | MissedEvent;
 
 - Unit tests sit next to the code (`foo.ts` → `foo.test.ts`) and run in Node.
 - DOM tests opt into jsdom with `// @vitest-environment jsdom` on the first line.
-- Anything that needs real layout, canvas, or focus goes in `e2e/` (Playwright).
+- Anything that needs real layout, canvas, or focus goes in `e2e/` (Playwright). Specs mount the built package on `e2e/harness/` with `mountBoard` or `mountElement` from `e2e/fixtures.ts`, never on the demo pages. Running `playwright test` directly needs a fresh `npm run build`; the suite refuses a `dist/` older than `src/`.
 - A regression test says which bug it guards against.
 - The coding standards apply to tests too. Biome skips the length check there, since a `describe` block groups many tests; keep each test itself within the rule of 30.
 - Physics changes come with before/after numbers from `npm run sim`.

@@ -45,7 +45,8 @@
     "size": "size-limit",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build && npm run size",
     "sim": "tsx scripts/simulate.ts",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && playwright test",
+    "mutate": "stryker run",
     "docs:dev": "npm --prefix site run dev",
     "docs:build": "npm --prefix site run build",
     "docs:examples": "tsc -p site/examples && tsc -p site/examples/recipes/html && tsc -p site/examples/recipes/react && tsc -p site/examples/recipes/solid && tsc -p site/examples/recipes/angular && tsc -p site/.vitepress/theme/playground"
@@ -67,6 +68,8 @@
     "@biomejs/biome": "^2.5.15",
     "@playwright/test": "^1.63.0",
     "@size-limit/preset-small-lib": "^14.1.0",
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/node": "^22.20.4",
     "jsdom": "^30.1.1",
     "size-limit": "^14.1.0",

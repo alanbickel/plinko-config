@@ -1,10 +1,10 @@
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
-import { expect, test } from './fixtures';
+import { ELEMENT_FIXTURE, expect, mountBoard, mountElement, test } from './fixtures';
 
-// axe-core scans of the board itself (not the debug page around it), against WCAG 2.2 A and AA,
-// in the states a visitor can reach. The board is canvas plus a little DOM, so axe checks the DOM
-// half: roles, names, descriptions, the live region, focusability, and the attribution link.
+// axe-core scans of the board itself, against WCAG 2.2 A and AA, in the states a visitor can
+// reach. The board is canvas plus a little DOM, so axe checks the DOM half: roles, names,
+// descriptions, the live region, focusability, and the attribution link.
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
@@ -15,33 +15,34 @@ async function violations(page: Page, selector: string) {
 }
 
 test.describe('the board (createPlinko)', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/runtime.html');
-    await expect(page.locator('#host canvas')).toBeVisible();
-  });
-
   test('has no violations when idle', async ({ page }) => {
+    await mountBoard(page, { host: 'fixed' });
     expect(await violations(page, '#host')).toEqual([]);
   });
 
   test('has no violations while holding a chip', async ({ page }) => {
-    await page.getByRole('button', { name: 'pickUp(selected)' }).click();
+    await mountBoard(page, { host: 'fixed' });
+    await page.evaluate(() => window.harness.board()?.pickUp('on'));
     await expect(page.locator('#host .plinko-config')).toHaveAttribute('data-state', 'holding');
     expect(await violations(page, '#host')).toEqual([]);
   });
 
   test('has no violations once locked', async ({ page }) => {
-    await page.locator('#refill').selectOption('never');
-    await page.locator('#countOn').fill('0');
-    await page.locator('#countOff').fill('0');
-    await page.locator('#countOff').blur(); // remounts with no chips at all: locked at once
+    // No chips at all and no refill: locked at once.
+    const chips = [
+      { id: 'on', label: 'On', count: 0 },
+      { id: 'off', label: 'Off', count: 0 },
+    ];
+    await mountBoard(page, {
+      host: 'fixed',
+      options: { chips, supply: { refill: { mode: 'never' } } },
+    });
     await expect(page.locator('#host .plinko-config')).toHaveAttribute('data-state', 'locked');
     expect(await violations(page, '#host')).toEqual([]);
   });
 });
 
 test('<plinko-board> has no violations, shadow DOM included', async ({ page }) => {
-  await page.goto('/fixtures/element.html');
-  await expect(page.locator('plinko-board canvas')).toBeVisible();
+  await mountElement(page, ELEMENT_FIXTURE);
   expect(await violations(page, 'plinko-board')).toEqual([]);
 });

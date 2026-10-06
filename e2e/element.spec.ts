@@ -1,9 +1,9 @@
-import { expect, test } from './fixtures';
+import { ELEMENT_FIXTURE, expect, mountElement, test } from './fixtures';
 
-// Runs against demo/fixtures/element.html: <plinko-board> set up through its options property.
+// <plinko-board> (dist/element.js), set up through its options property.
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/fixtures/element.html');
+  await mountElement(page, ELEMENT_FIXTURE);
 });
 
 test('renders the board inside its shadow root, within the element and the screen', async ({

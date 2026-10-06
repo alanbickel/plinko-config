@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
-import { expect, test } from './fixtures';
+import { countOf, expect, mountBoard, test } from './fixtures';
 
-// Runs against demo/runtime.html (five slots; On and Off chips). Taps are real touch input on the
+// The default harness board (five slots; On and Off chips). Taps are real touch input on the
 // mobile project and clicks on desktop. Playwright can't drag by touch, so drags use the mouse
 // (desktop only); the user checks touch drags by hand on a touchscreen.
 
@@ -46,22 +46,22 @@ async function lastDropX(page: Page): Promise<number> {
   return JSON.parse((text ?? '').replace(/^onDrop\s*/, '')).dropX;
 }
 
-test.beforeEach(async ({ page }) => {
-  await page.goto('/runtime.html');
-  await expect(canvas(page)).toBeVisible();
-});
-
 test('a tap picks nothing up: the chip goes straight back', async ({ page, isMobile }) => {
+  await mountBoard(page, { host: 'fixed' });
   const { trayChip, overBoard } = await spots(page);
   await tapOrClick(canvas(page), { position: trayChip(0), isMobile });
   await expect(board(page)).toHaveAttribute('data-state', 'idle');
-  await expect(page.locator('#state')).toContainText('"on":5');
+  await expect.poll(() => countOf(page, 'on')).toBe(5);
   await tapOrClick(canvas(page), { position: overBoard(0.5), isMobile });
   await expect(page.locator('#log')).not.toContainText('onDrop');
 });
 
 test.describe('mouse drag', () => {
   test.skip(({ isMobile }) => isMobile, 'Playwright can only tap by touch');
+
+  test.beforeEach(async ({ page }) => {
+    await mountBoard(page, { host: 'fixed' });
+  });
 
   /** Presses on one spot, drags to another in steps, and lets go. */
   async function drag(page: Page, { from, to }: DragInput): Promise<void> {
@@ -95,7 +95,7 @@ test.describe('mouse drag', () => {
     const middle = { x: (box?.width ?? 0) / 2, y: (box?.height ?? 0) / 2 };
     await drag(page, { from: onPage(trayChip(0)), to: onPage(middle) });
     await expect(lastAnnouncement(page)).toHaveText('The On chip fell off the board.');
-    await expect(page.locator('#state')).toContainText('"on":4');
+    await expect.poll(() => countOf(page, 'on')).toBe(4);
     await expect(page.locator('#log')).not.toContainText('onDrop');
   });
 
@@ -109,7 +109,7 @@ test.describe('mouse drag', () => {
     await page.mouse.move(from.x, from.y, { steps: 10 });
     await page.mouse.up();
     await expect(board(page)).toHaveAttribute('data-state', 'idle');
-    await expect(page.locator('#state')).toContainText('"on":5');
+    await expect.poll(() => countOf(page, 'on')).toBe(5);
   });
 });
 
@@ -123,7 +123,8 @@ test.describe('touch', () => {
 
   test.beforeEach(async ({ page }) => {
     // A host without a height of its own: the board fills the width, but no taller than the screen.
-    await page.locator('#hostHeight').setChecked(false);
+    // The page is taller than the screen, so it can scroll.
+    await mountBoard(page, { host: 'auto', css: 'body { padding-bottom: 150vh; }' });
   });
 
   test('the whole board fits on the screen', async ({ page }) => {
