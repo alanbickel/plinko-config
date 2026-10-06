@@ -13,6 +13,9 @@ export default {
   reporters: ['clear-text', 'progress', 'html'],
   htmlReporter: { fileName: 'reports/mutation/index.html' },
   tempDirName: '.stryker-tmp',
+  // A fresh Vitest worker takes ~5 s to start; the default margin (5 s) times out healthy runs and
+  // counts them as detected. 30 s still catches real infinite loops.
+  timeoutMS: 30000,
   // Stryker rewrites tsconfig paths through the TypeScript JS API, which TypeScript 7 doesn't
   // have. Our tsconfig has no extends or references to rewrite, so point it at nothing to skip.
   tsconfigFile: 'no-tsconfig-for-stryker.json',
