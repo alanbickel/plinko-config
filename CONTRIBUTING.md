@@ -14,6 +14,8 @@ npx playwright install chromium webkit   # once, for e2e tests
 | `npm run dev` | Demo pages: `/` (showcase), `/debug.html` (physics), `/runtime.html` (runtime) |
 | `npm run check` | Lint, typecheck, unit tests, build, size budget |
 | `npm run test:e2e` | Build, then run the Playwright suite in `e2e/` against `dist/` (desktop and Android Chromium, iPhone and iPad WebKit) |
+| `npm run build && npx playwright test --ui` | The same suite in Playwright's UI: pick projects under **Projects**, press ▶ to run, then step through each action with before/after snapshots. Nothing runs until you press ▶; rebuild after library changes |
+| `npm run mutate` | Stryker mutation testing of the sizing and label code (on demand; report in `reports/mutation/`) |
 | `npm run sim -- --drops 5000 --x 0.5` | Headless physics simulation (options in `scripts/simulate.ts`) |
 | `npm run docs:dev` | Docs site with live reload (run `npm install` in `site/` once first) |
 | `npm run docs:build` | Build the docs site; fails on undocumented exports or dead links |
