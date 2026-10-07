@@ -15,7 +15,9 @@ npx playwright install chromium webkit   # once, for e2e tests
 | `npm run check` | Lint, typecheck, unit tests, build, size budget |
 | `npm run test:e2e` | Build, then run the Playwright suite in `e2e/` against `dist/` (desktop and Android Chromium, iPhone and iPad WebKit) |
 | `npm run build && npx playwright test --ui` | The same suite in Playwright's UI: pick projects under **Projects**, press ▶ to run, then step through each action with before/after snapshots. Nothing runs until you press ▶; rebuild after library changes |
+| `npx tsx scripts/sabotage.ts [patch…]` | Proves the sizing and label tests can fail: plants each named bug in `src/`, checks that the tests meant to catch it fail, then restores the files and rebuilds `dist/` (a few minutes; don't edit files while it runs) |
 | `npm run mutate` | Stryker mutation testing of the sizing and label code (on demand; report in `reports/mutation/`) |
+| `npm run build && npx tsx scripts/label-ceilings.ts` | Measure the most slots whose labels stay apart, per screen, text scale, rows and layout: the table in the sizing docs (about a minute) |
 | `npm run sim -- --drops 5000 --x 0.5` | Headless physics simulation (options in `scripts/simulate.ts`) |
 | `npm run docs:dev` | Docs site with live reload (run `npm install` in `site/` once first) |
 | `npm run docs:build` | Build the docs site; fails on undocumented exports or dead links |
@@ -182,9 +184,11 @@ type WorldEvent = LandedEvent | MissedEvent;
 - A regression test says which bug it guards against.
 - The coding standards apply to tests too. Biome skips the length check there, since a `describe` block groups many tests; keep each test itself within the rule of 30.
 - Physics changes come with before/after numbers from `npm run sim`.
+- Tests should be able to fail. For the sizing and label code, `scripts/sabotage.ts` checks this: each patch plants one bug and names the tests that must catch it. Add a patch when you add a rule.
 - Some docs pages state behaviour a spec checks. Change the page and the spec together:
 
   | Page | Spec |
   |---|---|
   | [Sizing: Text size](site/contracts/sizing.md#text-size) and [Labels and narrow slots](site/contracts/sizing.md#labels-and-narrow-slots) | `src/runtime/view/slot-labels.test.ts` (every rule, across the cross product) and `e2e/text-size.spec.ts` (real fonts) |
+  | The table in [Labels and narrow slots](site/contracts/sizing.md#labels-and-narrow-slots) | Measured by `scripts/label-ceilings.ts`; re-run it and paste the table after changing how labels or the board are sized |
   | [Sizing internals](site/internals/sizing.md) (fitting, planning slot labels) | `src/runtime/sizing.test.ts`, `src/runtime/view/slot-labels.test.ts` |
