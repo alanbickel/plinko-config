@@ -4,30 +4,40 @@
 import type { BoardContext } from './context';
 
 const FALLBACK_WIDTH = 300;
+/** The root font size when there's no window to read it from (the browser default). */
+const DEFAULT_REM_PX = 16;
 
-interface FitInput {
+export interface FitInput {
   /** Width available, CSS pixels. */
   available: number;
   /** Height the canvas may use; Infinity when nothing limits it. */
   roomHeight: number;
-  /** Board width ÷ height. */
-  aspect: number;
+  /** The canvas's CSS height at a CSS width. */
+  heightAt: (width: number) => number;
 }
 
 export function fitToHost(ctx: BoardContext): void {
   const { canvas, wrapper } = ctx.dom;
   // Collapse the canvas for a moment: whatever height the host keeps then is its own.
   canvas.style.height = '0px';
+  const remPx = remOf(ctx);
   const width = fitWidth({
     available: wrapper.clientWidth || FALLBACK_WIDTH,
     roomHeight: Math.min(hostRoom(ctx), screenRoom(ctx)),
-    aspect: ctx.view.aspect,
+    heightAt: (cssWidth) => ctx.view.heightAt({ cssWidth, remPx }),
   });
-  const height = ctx.view.resize(width, ctx.win?.devicePixelRatio || 1);
+  const dpr = ctx.win?.devicePixelRatio || 1;
+  const height = ctx.view.resize({ cssWidth: width, remPx, dpr });
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
   if (ctx.dom.attribution) ctx.dom.attribution.style.width = `${width}px`;
   ctx.loop.redraw();
+}
+
+/** The root font size, CSS pixels: what rem-sized canvas text is sized from. */
+function remOf({ win }: BoardContext): number {
+  const size = win ? parseFloat(win.getComputedStyle(win.document.documentElement).fontSize) : NaN;
+  return size > 0 ? size : DEFAULT_REM_PX;
 }
 
 /** Host height left for the canvas, after padding and the wrapper's other content. */
@@ -49,6 +59,22 @@ function screenRoom({ dom }: BoardContext): number {
 /** A height of 1px or less means nothing measurable: no limit. */
 const usable = (height: number) => (height > 1 ? height : Infinity);
 
-function fitWidth({ available, roomHeight, aspect }: FitInput): number {
-  return Math.min(available, roomHeight * aspect);
+/** No canvas is narrower than this, CSS pixels, even when nothing fits the room. */
+const MIN_WIDTH = 1;
+/** Halvings of the width: far finer than a pixel at any screen size. */
+const FIT_STEPS = 24;
+
+/**
+ * The widest canvas, up to the available width, whose height fits the room. Height grows with
+ * width, but not in proportion (rem-sized text strips don't scale with the board), so the width is
+ * found by halving rather than from an aspect ratio.
+ */
+export function fitWidth({ available, roomHeight, heightAt }: FitInput): number {
+  if (heightAt(available) <= roomHeight) return available;
+  let [lo, hi] = [Math.min(MIN_WIDTH, available), available];
+  for (let i = 0; i < FIT_STEPS; i++) {
+    const mid = (lo + hi) / 2;
+    [lo, hi] = heightAt(mid) <= roomHeight ? [mid, hi] : [lo, mid];
+  }
+  return lo;
 }

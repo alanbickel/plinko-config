@@ -182,3 +182,9 @@ type WorldEvent = LandedEvent | MissedEvent;
 - A regression test says which bug it guards against.
 - The coding standards apply to tests too. Biome skips the length check there, since a `describe` block groups many tests; keep each test itself within the rule of 30.
 - Physics changes come with before/after numbers from `npm run sim`.
+- Some docs pages state behaviour a spec checks. Change the page and the spec together:
+
+  | Page | Spec |
+  |---|---|
+  | [Sizing: Text size](site/contracts/sizing.md#text-size) and [Labels and narrow slots](site/contracts/sizing.md#labels-and-narrow-slots) | `src/runtime/view/slot-labels.test.ts` (every rule, across the cross product) and `e2e/text-size.spec.ts` (real fonts) |
+  | [Sizing internals](site/internals/sizing.md) (fitting, planning slot labels) | `src/runtime/sizing.test.ts`, `src/runtime/view/slot-labels.test.ts` |

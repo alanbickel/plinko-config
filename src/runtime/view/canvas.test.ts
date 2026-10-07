@@ -30,7 +30,7 @@ function view(width: number) {
     slotLabels: DEFAULT_SLOT_LABELS,
     reducedMotion: false,
   });
-  return { v, height: v.resize(width, 2) };
+  return { v, height: v.resize({ cssWidth: width, remPx: 16, dpr: 2 }) };
 }
 
 describe('hitTest', () => {

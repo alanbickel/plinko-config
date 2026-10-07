@@ -27,7 +27,7 @@ import {
   fitText,
   type LabelPlan,
   type Measure,
-  MIN_TEXT_PX,
+  measureLabels,
   planSlotLabels,
   type ResolvedSlotLabels,
   setFont,
@@ -134,24 +134,40 @@ interface Stroke {
   width: number;
 }
 
+/** The canvas width and root font size the board is laid out for. */
+export interface CanvasSize {
+  /** CSS pixels. */
+  cssWidth: number;
+  /** CSS pixels per rem. */
+  remPx: number;
+}
+
+export interface ResizeInput extends CanvasSize {
+  dpr: number;
+}
+
 export class CanvasView {
   private geometry: Geometry;
   /** Absent when there's no 2D context (e.g. jsdom); the view then just doesn't draw. */
   private readonly painter: Painter | undefined;
   private readonly measure: Measure;
-  /** Width on the page, CSS pixels; set by resize. */
-  private cssWidth = 1;
+  /** Slot label widths at font size 1; measured again when fonts or labels change. */
+  private widths: number[];
+  /** Set by resize. */
+  private size: CanvasSize = { cssWidth: 1, remPx: 16 };
 
   constructor(private input: CanvasViewInput) {
     const g = input.canvas.getContext('2d');
     this.measure = g ? measureWith(g) : estimate;
-    this.geometry = this.computeGeometry();
+    this.widths = this.measureLabels();
+    this.geometry = this.computeGeometry(this.size);
     this.painter = g ? new Painter({ ...input, ...this.geometry, g }) : undefined;
   }
 
-  /** Width ÷ height of everything drawn, tray included. */
-  get aspect(): number {
-    return this.viewport.w / this.viewport.h;
+  /** CSS height of everything drawn, tray included, at a canvas size. */
+  heightAt(size: CanvasSize): number {
+    const { viewport } = this.computeGeometry(size);
+    return (size.cssWidth * viewport.h) / viewport.w;
   }
 
   /** The held chip's path from the tray to the drop line; moves with the label strip. */
@@ -163,16 +179,20 @@ export class CanvasView {
     return this.geometry.viewport;
   }
 
-  /** Plans the labels, then lays out everything around their strip. */
-  private computeGeometry(): Geometry {
-    const { layout, slots, styles, slotLabels } = this.input;
-    const plan = planSlotLabels({
+  private measureLabels(): number[] {
+    const { slots, styles } = this.input;
+    return measureLabels({
       labels: slots.map((slot) => slot.label),
       styles: slots.map((_, i) => styles.slots[i]?.label ?? styles.text),
-      options: slotLabels,
-      layout,
       measure: this.measure,
     });
+  }
+
+  /** Plans the labels, then lays out everything around their strip. */
+  private computeGeometry({ cssWidth, remPx }: CanvasSize): Geometry {
+    const { layout, slotLabels } = this.input;
+    const options = slotLabels;
+    const plan = planSlotLabels({ widths: this.widths, options, layout, remPx, cssWidth });
     const geometry = { layout, strip: plan.strip };
     return { viewport: computeViewport(geometry), carry: carryPath(geometry), plan };
   }
@@ -180,22 +200,22 @@ export class CanvasView {
   /** Re-plans after the labels' fonts or layout change. True if the board's shape changed. */
   private relayout(): boolean {
     const before = this.viewport;
-    this.geometry = this.computeGeometry();
+    this.widths = this.measureLabels();
+    this.geometry = this.computeGeometry(this.size);
     this.painter?.setGeometry(this.geometry);
     return before.w !== this.viewport.w || before.h !== this.viewport.h;
   }
 
-  /** Sizes the backing store for a CSS width; returns the CSS height to use. */
-  resize(cssWidth: number, dpr: number): number {
+  /** Lays the board out for a canvas size and sizes the backing store; returns the CSS height. */
+  resize({ dpr, ...size }: ResizeInput): number {
     const { canvas } = this.input;
-    this.cssWidth = cssWidth;
-    const cssHeight = (cssWidth * this.viewport.h) / this.viewport.w;
-    canvas.width = Math.max(1, Math.round(cssWidth * dpr));
+    this.size = size;
+    this.geometry = this.computeGeometry(size);
+    this.painter?.setGeometry(this.geometry);
+    const cssHeight = (size.cssWidth * this.viewport.h) / this.viewport.w;
+    canvas.width = Math.max(1, Math.round(size.cssWidth * dpr));
     canvas.height = Math.max(1, Math.round(cssHeight * dpr));
-    this.painter?.setScale({
-      device: canvas.width / this.viewport.w,
-      css: cssWidth / this.viewport.w,
-    });
+    this.painter?.setScale(canvas.width / this.viewport.w);
     return cssHeight;
   }
 
@@ -226,7 +246,7 @@ export class CanvasView {
   hitTest(css: CssPoint): Hit | null {
     const { layout, kinds } = this.input;
     const { x0, y0, w, h, trayY } = this.viewport;
-    const scale = w / this.cssWidth;
+    const scale = w / this.size.cssWidth;
     const point = { x: x0 + css.x * scale, y: y0 + css.y * scale };
     if (point.x < x0 || point.x > x0 + w || point.y < y0 || point.y > y0 + h) return null;
     const column = Math.floor((point.x / layout.width) * kinds.length);
@@ -243,8 +263,6 @@ export class CanvasView {
 class Painter {
   private readonly chipStyles = new Map<string, ResolvedChipStyle>();
   private scale = 1;
-  /** MIN_TEXT_PX in board units at the current size. */
-  private minSize = 0;
 
   constructor(private input: PainterInput) {
     this.setLook(input);
@@ -266,10 +284,9 @@ class Painter {
     this.input = { ...this.input, ...geometry };
   }
 
-  /** Device pixels per board unit (drawing) and CSS pixels per board unit (the text floor). */
-  setScale({ device, css }: Scale): void {
+  /** Device pixels per board unit. */
+  setScale(device: number): void {
     this.scale = device;
-    this.minSize = MIN_TEXT_PX / css;
   }
 
   paint(frame: FrameState): void {
@@ -401,7 +418,6 @@ class Painter {
       styles: slots.map((_, i) => styles.slots[i]?.label ?? styles.text),
       layout,
       stripTop: layout.floorY + FLOOR,
-      minSize: this.minSize,
     });
   }
 
@@ -458,7 +474,8 @@ class Painter {
   /** One centred line: shrunk to fit (never below the minimum size), then cut with "…". */
   private line({ text, style, size, maxWidth, at }: LineInput): void {
     const { g } = this.input;
-    const fitted = fitText({ g, text, style, size, maxWidth, minSize: this.minSize });
+    const minSize = this.input.plan.minSize;
+    const fitted = fitText({ g, text, style, size, maxWidth, minSize });
     g.save();
     g.translate(at.x, at.y);
     drawText(g, { ...fitted, style, align: 'center' });
@@ -492,11 +509,6 @@ class Painter {
     g.lineWidth = stroke.width;
     g.stroke();
   }
-}
-
-interface Scale {
-  device: number;
-  css: number;
 }
 
 interface LineInput {

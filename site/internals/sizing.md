@@ -4,17 +4,32 @@ description: How the board measures the screen and its target, and when it refit
 
 # Sizing internals
 
-The behaviour is described in [Sizing](../contracts/sizing). This page covers how it's measured. The code is in `src/runtime/sizing.ts` and `src/runtime/observe.ts`.
+The behaviour is described in [Sizing](../contracts/sizing). This page covers how it's measured. The code is in `src/runtime/sizing.ts`, `src/runtime/observe.ts`, and `src/runtime/view/slot-labels.ts`.
 
 ## Fitting
 
-`fitToHost()` picks the largest width that satisfies three limits, then sets the canvas height from the board's aspect ratio:
+`fitToHost()` reads the root font size, then picks the largest width that satisfies three limits:
 
 - the wrapper's width,
-- the target's own height, if it has one, times the aspect ratio,
-- the screen's height, times the aspect ratio.
+- the target's own height, if it has one,
+- the screen's height.
 
 From both heights it first subtracts the wrapper's other content, such as the attribution link, since that content sits under the canvas.
+
+The canvas's height isn't proportional to its width: the board scales with the width, but the label strip is sized in rem and doesn't. So `fitWidth()` doesn't use an aspect ratio. If the full width is too tall, it halves the range of widths 24 times, asking the view for the height at each width (`heightAt()`), and keeps the widest that fits. Height grows with width, except where `horizontalWhenFit` switches layout at some width; there it finds a width that fits, not always the widest.
+
+The root font size is read at every fit; a change to it alone is picked up at the next refit. Page zoom changes the screen's size in CSS pixels, so it refits on its own.
+
+## Planning slot labels
+
+`planSlotLabels()` (in `src/runtime/view/slot-labels.ts`) is a pure function of the canvas width and the root font size. It works in CSS pixels, then converts the plan to board units for drawing. Each label's width is measured once at size 1, when the labels or their fonts change, and scaled from there: text width is proportional to font size.
+
+- **Board width.** The board gets the canvas width minus the room angled labels need past the walls (mirrored on the left, so the board stays centred): `unit = (cssWidth − 2 × extra) ÷ (slots + 2 × side)`. The room needed shrinks as the unit grows, since the last label starts inside its slot, so this is solved in closed form.
+- **Strip cap.** Vertical and angled strips stop at half the board's height from the drop line to the floor.
+- **Apart.** Neighbouring labels need 1.1 text sizes between them: the slot width for vertical and backboard labels, slot width × sin 40° for angled ones.
+- **Shrink, then cut.** Labels that don't fit the cap, or don't stay apart, shrink toward the floor; at the floor they're cut. Smaller text means a shorter strip and a wider board, so the largest size (or run) that fits is found by halving, 40 times. When even floor-size text can't stay apart, labels stay at the floor and overlap.
+
+Drawing uses the plan's size and floor, so labels are never drawn larger than planned. `fitText()` treats text within a billionth of its room as fitting, since text sized to fit exactly can measure a hair over from rounding.
 
 ## Measuring the screen
 

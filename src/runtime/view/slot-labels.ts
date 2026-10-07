@@ -1,10 +1,10 @@
 // Slot labels under (or on) the board. A board-wide layout decides where they go; the plan sizes
-// the label strip, which feeds the board's geometry. Text never shrinks below MIN_TEXT_PX on
-// screen; past each layout's space limit it's cut with an ellipsis.
+// the label strip, which feeds the board's geometry. Text is sized in rem and never shrinks below
+// MIN_TEXT_REM; past each layout's space limit it's cut with an ellipsis.
 
 import type { Layout } from '../../core/layout';
 import { fontOf, type ResolvedText } from '../styles';
-import type { LabelStrip } from './geometry';
+import { type LabelStrip, SIDE } from './geometry';
 
 /**
  * Where slot labels go. `'horizontal'`: one line under each slot. `'vertical'`: under each slot,
@@ -33,24 +33,37 @@ export const DEFAULT_SLOT_LABELS: Required<SlotLabelOptions> = {
   horizontalWhenFit: true,
 };
 
-/** No canvas text is drawn smaller than this, in CSS pixels (WCAG sets none; Material's smallest). */
-export const MIN_TEXT_PX = 12;
+/** Slot label text size, rem: it follows the root font size, so browser text settings and zoom. */
+export const LABEL_REM = 0.875;
+/** No canvas text is drawn smaller than this, rem. */
+export const MIN_TEXT_REM = 0.75;
 
-/** Normal text size, board units. */
+/** Tray caption size, board units. */
 export const TEXT_SIZE = 0.26;
-/** Width a horizontal label may use, board units (a slot is 1). */
+/** Share of a slot's width a horizontal label may use. */
 const CELL = 0.92;
-const HORIZONTAL_STRIP = 0.7;
-/** Space around vertical and angled labels in their strip. */
-const PAD = 0.3;
-/** Vertical and angled strips never grow past this, board units. */
-const MAX_STRIP = 3;
-/** Vertical text is bounded by the strip, not the slot width, so it can be larger. */
-const MAX_VERTICAL_SIZE = 0.4;
+/** Horizontal strip height, in text sizes. */
+const HORIZONTAL_STRIP = 2.7;
+/** Space around vertical and angled labels in their strip, in text sizes. */
+const PAD = 1.15;
+/** Vertical and angled strips stop growing at this share of the board, drop line to floor. */
+const STRIP_SHARE = 0.5;
 const ANGLE = (40 * Math.PI) / 180;
-const BACKBOARD_SIZE = 0.3;
+/** Angled labels start this far into their slot, board units. */
+const ANGLED_X = 0.4;
 const BACKBOARD_STRIP = 0.25;
 const QUARTER_TURN = Math.PI / 2;
+/** Halvings when shrinking text into a strip: far finer than a pixel. */
+const SHRINK_STEPS = 40;
+/** A line of text across, in text sizes: neighbouring labels need this much room to stay apart. */
+const LINE = 1.1;
+/** Room between neighbouring labels per board unit of slot width, by layout. */
+const SPACING: Record<SlotLabelLayout, number> = {
+  horizontal: 1,
+  vertical: 1,
+  backboard: 1,
+  angled: Math.sin(ANGLE),
+};
 
 /** Some text at a size, to measure. */
 export interface MeasureInput {
@@ -59,84 +72,203 @@ export interface MeasureInput {
   size: number;
 }
 
-/** Measures text, board units. */
+/** Measures text, in the unit of size. */
 export type Measure = (input: MeasureInput) => number;
+
+export interface MeasureLabelsInput {
+  labels: readonly string[];
+  /** Label style per slot (font), parallel to labels. */
+  styles: readonly ResolvedText[];
+  measure: Measure;
+}
+
+/** Each label's width at font size 1 (text width scales with size), parallel to the labels. */
+export function measureLabels(input: MeasureLabelsInput): number[] {
+  const { labels, styles, measure } = input;
+  return labels.map((text, i) => (styles[i] ? measure({ text, style: styles[i], size: 1 }) : 0));
+}
 
 /** How the labels will be drawn: the layout in effect, the text size, and the strip it needs. */
 export interface LabelPlan {
   mode: SlotLabelLayout;
+  /** Text size, board units. */
   size: number;
+  /** Smallest size text may shrink to before it's cut, board units. */
+  minSize: number;
   strip: LabelStrip;
   /** Longest a label may run, board units; longer ones are cut with "…". */
   extent: number;
+  /** CSS pixels per board unit at this canvas width. */
+  unit: number;
 }
 
 export interface PlanInput {
-  labels: readonly string[];
-  /** Label style per slot (font), parallel to labels. */
-  styles: readonly ResolvedText[];
+  /** From measureLabels. */
+  widths: readonly number[];
   options: ResolvedSlotLabels;
   layout: Layout;
-  measure: Measure;
+  /** CSS pixels per rem: the root font size. */
+  remPx: number;
+  /** Canvas width, CSS pixels. */
+  cssWidth: number;
 }
 
+/**
+ * Plans the labels for a canvas width. Text is sized in rem and measured in CSS pixels; the board
+ * gets whatever width the labels leave it, and the plan comes back in board units for drawing.
+ */
 export function planSlotLabels(input: PlanInput): LabelPlan {
-  const { options } = input;
-  const fallBack = options.horizontalWhenFit && options.layout !== 'backboard';
-  const mode = fallBack && allFit(input) ? 'horizontal' : options.layout;
-  return PLANS[mode](input);
+  const px = pxOf(input);
+  const { layout, horizontalWhenFit } = input.options;
+  const fallBack = horizontalWhenFit && layout !== 'backboard';
+  const allFit = input.widths.every((w) => w * px.normal <= CELL * px.unit);
+  const plan = PLANS[fallBack && allFit ? 'horizontal' : layout](px);
+  return toBoardUnits(plan, px.floor);
 }
 
-/** Every label fits one line in its slot at the normal size. */
-function allFit({ labels, styles, measure }: PlanInput): boolean {
-  return labels.every((text, i) => fitsAt({ text, style: styles[i], size: TEXT_SIZE, measure }));
+/** What every layout plans from, CSS pixels. */
+interface Px {
+  layout: Layout;
+  cssWidth: number;
+  /** The longest label's width at font size 1. */
+  longest: number;
+  /** Normal text size, and the size it never shrinks below. */
+  normal: number;
+  floor: number;
+  /** CSS pixels per board unit with no room past the walls. */
+  unit: number;
 }
 
-interface FitCheck {
-  text: string;
-  style: ResolvedText | undefined;
+const pxOf = ({ widths, layout, remPx, cssWidth }: PlanInput): Px => ({
+  layout,
+  cssWidth,
+  longest: Math.max(0, ...widths),
+  normal: LABEL_REM * remPx,
+  floor: MIN_TEXT_REM * remPx,
+  unit: cssWidth / (layout.width + 2 * SIDE),
+});
+
+/** A plan in CSS pixels. */
+interface PxPlan {
+  mode: SlotLabelLayout;
   size: number;
-  measure: Measure;
+  height: number;
+  extraRight: number;
+  extent: number;
+  unit: number;
 }
 
-const fitsAt = ({ text, style, size, measure }: FitCheck): boolean =>
-  style !== undefined && measure({ text, style, size }) <= CELL;
+const toBoardUnits = ({ mode, size, height, extraRight, extent, unit }: PxPlan, floor: number) => ({
+  mode,
+  size: size / unit,
+  minSize: floor / unit,
+  strip: { height: height / unit, extraRight: extraRight / unit },
+  extent: extent / unit,
+  unit,
+});
 
-/** Width of the longest label at size 1. */
-function longestAtUnit({ labels, styles, measure }: PlanInput): number {
-  return Math.max(
-    0,
-    ...labels.map((text, i) => (styles[i] ? measure({ text, style: styles[i], size: 1 }) : 0)),
-  );
-}
-
-const PLANS: Record<SlotLabelLayout, (input: PlanInput) => LabelPlan> = {
-  horizontal: () => ({
+const PLANS: Record<SlotLabelLayout, (px: Px) => PxPlan> = {
+  horizontal: ({ normal, unit }) => ({
     mode: 'horizontal',
-    size: TEXT_SIZE,
-    strip: { height: HORIZONTAL_STRIP, extraRight: 0 },
-    extent: CELL,
+    size: normal,
+    height: HORIZONTAL_STRIP * normal,
+    extraRight: 0,
+    extent: CELL * unit,
+    unit,
   }),
-  vertical: (input) => {
-    const longest = longestAtUnit(input);
-    const size = Math.min(MAX_VERTICAL_SIZE, (MAX_STRIP - PAD) / Math.max(longest, 1e-6));
-    const height = Math.min(longest * size + PAD, MAX_STRIP);
-    return { mode: 'vertical', size, strip: { height, extraRight: 0 }, extent: height - PAD };
+  vertical: (px) => planStrip(px, verticalAt),
+  angled: (px) => planStrip(px, angledAt),
+  backboard: (px) => {
+    const { layout, unit } = px;
+    const size = apartSize(px);
+    const extent = Math.max(0, (layout.floorY - layout.railTopY) * unit - PAD * size);
+    return { mode: 'backboard', size, height: BACKBOARD_STRIP * unit, extraRight: 0, extent, unit };
   },
-  angled: (input) => {
-    const extent = Math.min(longestAtUnit(input) * TEXT_SIZE, MAX_STRIP / Math.sin(ANGLE));
-    const height = extent * Math.sin(ANGLE) + PAD;
-    // The last label runs past the right wall; leave room for it.
-    const extraRight = Math.max(0, extent * Math.cos(ANGLE) - 0.4);
-    return { mode: 'angled', size: TEXT_SIZE, strip: { height, extraRight }, extent };
-  },
-  backboard: ({ layout }) => ({
-    mode: 'backboard',
-    size: BACKBOARD_SIZE,
-    strip: { height: BACKBOARD_STRIP, extraRight: 0 },
-    extent: layout.floorY - layout.railTopY - PAD,
-  }),
 };
+
+// --- strips that grow with their labels (vertical, angled) -------------------------------------
+
+/** Text of a size, running a length (its longest label, possibly cut), CSS pixels. */
+interface Run {
+  size: number;
+  run: number;
+}
+
+/** A strip's plan for a run of text. */
+type StripAt = (px: Px, text: Run) => PxPlan;
+
+const verticalAt: StripAt = ({ unit }, { size, run }) => ({
+  mode: 'vertical',
+  size,
+  height: run + PAD * size,
+  extraRight: 0,
+  extent: run,
+  unit,
+});
+
+/** The last label runs past the right wall; the board gets the width that leaves. */
+const angledAt: StripAt = ({ layout, cssWidth, unit }, { size, run }) => {
+  const overhang = run * Math.cos(ANGLE) + size * Math.sin(ANGLE);
+  const credit = 1 - ANGLED_X;
+  // Room past the wall is overhang - credit × unit, and the unit depends on that room.
+  const tight = (cssWidth - 2 * overhang) / (layout.width + 2 * SIDE - 2 * credit);
+  const roomy = overhang <= credit * unit;
+  const u = roomy ? unit : tight;
+  const extraRight = roomy ? 0 : overhang - credit * u;
+  const height = run * Math.sin(ANGLE) + PAD * size;
+  return { mode: 'angled', size, height, extraRight, extent: run, unit: u };
+};
+
+/** The strip's height limit, CSS pixels. */
+const capOf = (px: Px, plan: PxPlan) =>
+  STRIP_SHARE * (px.layout.floorY - px.layout.spawnY) * plan.unit;
+
+/** Neighbouring labels have a line's room between them. */
+const apart = (plan: PxPlan) => SPACING[plan.mode] * plan.unit >= LINE * plan.size;
+
+/** Backboard text: the normal size, or smaller toward the floor when slots are narrow. */
+const apartSize = ({ normal, floor, unit }: Px) =>
+  Math.max(floor, Math.min(normal, (SPACING.backboard * unit) / LINE));
+
+/**
+ * Whole labels at the normal size if they fit: the strip within its cap, and neighbours apart.
+ * Else smaller, down to the floor; else at the floor, cut to what fits. Smaller text and shorter
+ * runs mean a shorter strip and a wider board, so the largest that fits is found by halving. Where
+ * even the floor can't keep neighbours apart, labels stay at the floor and overlap least.
+ */
+function planStrip(px: Px, at: StripAt): PxPlan {
+  const hopeless = !apart(at(px, { size: px.floor, run: 0 }));
+  const fits = (plan: PxPlan) =>
+    plan.unit > 0 &&
+    plan.height <= capOf(px, plan) &&
+    (apart(plan) || (hopeless && plan.size <= px.floor));
+  const whole = (size: number) => at(px, { size, run: px.longest * size });
+  if (fits(whole(px.normal))) return whole(px.normal);
+  if (fits(whole(px.floor))) {
+    return whole(largest({ from: px.floor, to: px.normal, fits: (s) => fits(whole(s)) }));
+  }
+  const cut = (run: number) => at(px, { size: px.floor, run });
+  const plan = cut(largest({ from: 0, to: px.longest * px.floor, fits: (r) => fits(cut(r)) }));
+  // Even an empty strip may not fit a tiny board: then it just takes the cap.
+  return { ...plan, height: Math.min(plan.height, capOf(px, plan)) };
+}
+
+interface Search {
+  from: number;
+  to: number;
+  /** True at from, false at to, and switching once between them. */
+  fits: (value: number) => boolean;
+}
+
+/** The largest value between from and to that fits, by halving. */
+function largest({ from, to, fits }: Search): number {
+  let [lo, hi] = [from, to];
+  for (let i = 0; i < SHRINK_STEPS; i++) {
+    const mid = (lo + hi) / 2;
+    [lo, hi] = fits(mid) ? [mid, hi] : [lo, mid];
+  }
+  return lo;
+}
 
 // --- drawing ---------------------------------------------------------------------------------
 
@@ -148,8 +280,6 @@ export interface DrawLabelsInput {
   layout: Layout;
   /** Top of the label strip, board units. */
   stripTop: number;
-  /** MIN_TEXT_PX in board units at the current size. */
-  minSize: number;
 }
 
 /** One label's placement: where it starts, how it's turned, how it's aligned. */
@@ -163,22 +293,27 @@ interface Placement {
 type Place = (input: DrawLabelsInput, index: number) => Placement;
 
 const PLACES: Record<SlotLabelLayout, Place> = {
-  horizontal: ({ stripTop }, i) => ({
+  horizontal: ({ stripTop, plan }, i) => ({
     x: i + 0.5,
-    y: stripTop + HORIZONTAL_STRIP / 2,
+    y: stripTop + plan.strip.height / 2,
     rotate: 0,
     align: 'center',
   }),
-  vertical: ({ stripTop }, i) => ({
+  vertical: ({ stripTop, plan }, i) => ({
     x: i + 0.5,
-    y: stripTop + PAD / 2,
+    y: stripTop + (PAD * plan.size) / 2,
     rotate: QUARTER_TURN,
     align: 'left',
   }),
-  angled: ({ stripTop }, i) => ({ x: i + 0.4, y: stripTop + 0.12, rotate: ANGLE, align: 'left' }),
-  backboard: ({ layout }, i) => ({
+  angled: ({ stripTop, plan }, i) => ({
+    x: i + ANGLED_X,
+    y: stripTop + (PAD * plan.size) / 2,
+    rotate: ANGLE,
+    align: 'left',
+  }),
+  backboard: ({ layout, plan }, i) => ({
     x: i + 0.5,
-    y: layout.railTopY + 0.15,
+    y: layout.railTopY + (PAD * plan.size) / 2,
     rotate: QUARTER_TURN,
     align: 'left',
   }),
@@ -200,7 +335,7 @@ export function drawSlotLabels(input: DrawLabelsInput): void {
       style,
       size: plan.size,
       maxWidth: plan.extent,
-      minSize: input.minSize,
+      minSize: plan.minSize,
     });
     g.save();
     g.translate(place.x, place.y);
@@ -258,9 +393,12 @@ interface EllipsizeInput {
   maxWidth: number;
 }
 
+/** Text sized to fit exactly can measure a hair over its room from rounding; it still fits. */
+const ROUNDING = 1 + 1e-9;
+
 /** Cuts text with an ellipsis to fit maxWidth in the current font. */
 function ellipsize(g: CanvasRenderingContext2D, { text, maxWidth }: EllipsizeInput): string {
-  if (textWidth(g, text) <= maxWidth) return text;
+  if (textWidth(g, text) <= maxWidth * ROUNDING) return text;
   let t = text;
   while (t.length > 1 && textWidth(g, `${t}…`) > maxWidth) t = t.slice(0, -1);
   return `${t}…`;
