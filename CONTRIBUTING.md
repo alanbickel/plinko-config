@@ -16,7 +16,7 @@ npx playwright install chromium webkit   # once, for e2e tests
 | `npm run test:e2e` | Build, then run the Playwright suite in `e2e/` against `dist/` (desktop and Android Chromium, iPhone and iPad WebKit) |
 | `npm run build && npx playwright test --ui` | The same suite in Playwright's UI: pick projects under **Projects**, press ▶ to run, then step through each action with before/after snapshots. Nothing runs until you press ▶; rebuild after library changes |
 | `npx tsx scripts/sabotage.ts [patch…]` | Proves the sizing and label tests can fail: plants each named bug in `src/`, checks that the tests meant to catch it fail, then restores the files and rebuilds `dist/` (a few minutes; don't edit files while it runs) |
-| `npm run mutate` | Stryker mutation testing of the sizing and label code (on demand; report in `reports/mutation/`) |
+| `npm run mutate` | Stryker mutation testing of the sizing and label code. **Parked:** see [Mutation testing](#mutation-testing) |
 | `npm run build && npx tsx scripts/label-ceilings.ts` | Measure the most slots whose labels stay apart, per screen, text scale, rows and layout: the table in the sizing docs (about a minute) |
 | `npm run sim -- --drops 5000 --x 0.5` | Headless physics simulation (options in `scripts/simulate.ts`) |
 | `npm run docs:dev` | Docs site with live reload (run `npm install` in `site/` once first) |
@@ -192,3 +192,9 @@ type WorldEvent = LandedEvent | MissedEvent;
   | [Sizing: Text size](site/contracts/sizing.md#text-size) and [Labels and narrow slots](site/contracts/sizing.md#labels-and-narrow-slots) | `src/runtime/view/slot-labels.test.ts` (every rule, across the cross product) and `e2e/text-size.spec.ts` (real fonts) |
   | The table in [Labels and narrow slots](site/contracts/sizing.md#labels-and-narrow-slots) | Measured by `scripts/label-ceilings.ts`; re-run it and paste the table after changing how labels or the board are sized |
   | [Sizing internals](site/internals/sizing.md) (fitting, planning slot labels) | `src/runtime/sizing.test.ts`, `src/runtime/view/slot-labels.test.ts` |
+
+### Mutation testing
+
+We explored [Stryker](https://stryker-mutator.io/) for mutation testing: it plants small bugs (mutants) in the code and checks that some test fails for each one. With our versions (Stryker 10.0.0, Vitest 5.0.3) it doesn't look like it works well. Mutants in code that only runs inside a test (`it(...)`) never seem to be switched on, so they're reported as surviving even when the same bug, planted by hand, fails the tests. Code that runs at import time is mutated correctly, which makes the scores uneven and misleading.
+
+So we're parking it. The setup is still here (`npm run mutate`, `stryker.config.mjs`), but its scores aren't meaningful for now; `scripts/sabotage.ts` covers the same question for the sizing and label code. This is open for future investigation: a newer Stryker or Vitest may fix it, and `fitWidth` in `src/runtime/sizing.ts` makes a good first check, since its tests kill every planted mutant by hand.

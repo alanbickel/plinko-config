@@ -1,5 +1,6 @@
-// Mutation testing (npm run mutate): on demand, not in check or CI. Scoped to the code that sizes
-// the board and its text; widen `mutate` when another area needs the same scrutiny.
+// Mutation testing (npm run mutate). Parked: with Stryker 10 and Vitest 5 its scores aren't
+// meaningful yet; see CONTRIBUTING.md, "Mutation testing". Kept for future investigation.
+// Scoped to the code that sizes the board and its text; widen `mutate` when another area needs it.
 
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
