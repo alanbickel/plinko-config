@@ -47,9 +47,9 @@
     "sim": "tsx scripts/simulate.ts",
     "test:e2e": "npm run build && playwright test",
     "mutate": "stryker run",
-    "docs:dev": "npm --prefix site run dev",
-    "docs:build": "npm --prefix site run build",
-    "docs:examples": "tsc -p site/examples && tsc -p site/examples/recipes/html && tsc -p site/examples/recipes/react && tsc -p site/examples/recipes/solid && tsc -p site/examples/recipes/angular && tsc -p site/.vitepress/theme/playground && tsx scripts/readme-examples.ts && tsx scripts/playground-export.ts"
+    "docs:dev": "npm run build && npm --prefix site run dev",
+    "docs:build": "npm run build && npm --prefix site run build",
+    "docs:examples": "npm run build && tsc -p site/examples && tsc -p site/examples/recipes/html && tsc -p site/examples/recipes/react && tsc -p site/examples/recipes/solid && tsc -p site/examples/recipes/angular && tsc -p site/.vitepress/theme/playground && tsx scripts/readme-examples.ts && tsx scripts/playground-export.ts"
   },
   "size-limit": [
     {

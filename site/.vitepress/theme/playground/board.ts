@@ -1,7 +1,7 @@
 // Drives the playground's board: mounts it, sends live changes through update(), and rebuilds it
 // (after a short pause) when a mount-only option changes.
 
-import { createPlinko, type PlinkoBoard, type PlinkoOptions } from '../../../../src/index';
+import { createPlinko, type PlinkoBoard, type PlinkoOptions } from 'plinko-config';
 import { answerRequest, liveOptions, mountOptions, type PlaygroundConfig } from './config';
 
 export interface LogEntry {

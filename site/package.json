@@ -9,6 +9,9 @@
     "build": "npm run api && vitepress build",
     "preview": "vitepress preview"
   },
+  "dependencies": {
+    "plinko-config": "file:.."
+  },
   "devDependencies": {
     "@angular/core": "^22.2.1",
     "@types/react": "^19.3.0",

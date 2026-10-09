@@ -19,7 +19,7 @@ npx playwright install chromium webkit   # once, for e2e tests
 | `npm run mutate` | Stryker mutation testing of the sizing and label code. **Parked:** see [Mutation testing](#mutation-testing) |
 | `npm run build && npx tsx scripts/label-ceilings.ts` | Measure the most slots whose labels stay apart, per screen, text scale, rows and layout: the table in the sizing docs (about a minute) |
 | `npm run sim -- --drops 5000 --x 0.5` | Headless physics simulation (options in `scripts/simulate.ts`) |
-| `npm run docs:dev` | Docs site with live reload (run `npm install` in `site/` once first) |
+| `npm run docs:dev` | Build the library, then serve the docs site with live reload (run `npm install` in `site/` once first). The site imports the built package (`"plinko-config": "file:.."`), so after changing `src/`, run `npm run build` to see it there |
 | `npm run docs:build` | Build the docs site; fails on undocumented exports or dead links |
 | `npm run docs:examples` | Type-check the docs examples and framework recipes, check that the README's examples are copies of `site/examples/readme*.ts` regions, and type-check the playground's Export config output (as TypeScript and as JavaScript) |
 

@@ -31,6 +31,8 @@ jobs:
       - run: npm ci
       - run: npm ci
         working-directory: site
+      # Builds the library first: the site depends on it as "plinko-config": "file:..", so the
+      # site build below imports dist/ through the package's exports, as an app would.
       - run: npm run docs:examples
       # Fails if any public export lacks a doc comment (TypeDoc validation).
       - run: npm run build

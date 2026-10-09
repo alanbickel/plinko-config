@@ -8,7 +8,7 @@ import {
   type LandingLabelInput,
   type SlotConfig,
   type StockLabelInput,
-} from '../../../../src/index';
+} from 'plinko-config';
 
 /** settledBatch is left out: its input is a list, which a one-line template can't express. */
 export type LabelKey = Exclude<keyof Labels, 'settledBatch'>;

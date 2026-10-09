@@ -1,6 +1,6 @@
 // Slider definitions for the playground's control groups. Ranges match the library's validation.
 
-import type { SlotLabelLayout } from '../../../../src/index';
+import type { SlotLabelLayout } from 'plinko-config';
 import type { ControlsDraft, PlaygroundConfig } from './config';
 
 export interface SliderSpec<K extends string> {

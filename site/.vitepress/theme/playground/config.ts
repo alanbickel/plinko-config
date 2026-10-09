@@ -16,7 +16,7 @@ import {
   type SlotLabelOptions,
   type Styles,
   type Theme,
-} from '../../../../src/index';
+} from 'plinko-config';
 import { type LabelDrafts, labelsOption } from './labels';
 
 export { DEFAULT_BOARD, DEFAULT_PHYSICS, DEFAULT_SLOT_LABELS };
