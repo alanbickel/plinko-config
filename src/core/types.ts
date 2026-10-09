@@ -5,9 +5,9 @@
  * A slot at the bottom of the board: one outcome a chip can land in. `SV` is the type of `value`.
  */
 export interface SlotConfig<SV = unknown> {
-  /** Unique among slots. Used as the key in `physics.bias`. */
+  /** Unique among slots. Identifies the slot in `physics.bias` and `styles.slots`. */
   id: string;
-  /** Shown under the slot and used in announcements. */
+  /** Drawn on the board (where depends on `slotLabels`) and read out in announcements. */
   label: string;
   /** What landing here means for your app. Passed back to `onLand`. */
   value?: SV;
@@ -19,9 +19,12 @@ export interface SlotConfig<SV = unknown> {
  * A kind of chip the player can drop, such as "On" or "Off". `CV` is the type of `value`.
  */
 export interface ChipKindConfig<CV = unknown> {
-  /** Unique among chip kinds. Used in `supply` calls and `drop({ chip })`. */
+  /**
+   * Unique among chip kinds. Identifies the kind in `styles.chips`, `board.supply` and
+   * `board.drop()`.
+   */
   id: string;
-  /** Shown in the tray and used in announcements. */
+  /** Shown in the tray and read out in announcements. */
   label: string;
   /** What this chip means for your app. Passed back to callbacks. */
   value?: CV;
@@ -79,38 +82,48 @@ export interface PhysicsConfig {
    */
   gravity?: number;
   /**
-   * Bounciness, 0..1.
+   * Bounciness, 0..1. At about 0.15 or less, chips can settle into a lane and run straight down.
    *
    * @defaultValue `0.3`
    */
   restitution?: number;
   /**
-   * Coulomb friction coefficient, 0..1: tangential speed lost is at most this × the impact.
+   * How much a hit slows a chip sliding along a peg, 0..1. At about 0.3 or more, chips can come to
+   * rest on top of a peg.
    *
    * @defaultValue `0.1`
    */
   friction?: number;
   /**
-   * Max random sideways kick per peg hit, units per second. The "chaos" knob.
+   * The largest random sideways kick a peg hit adds, in units per second. Raise it for more
+   * unpredictable paths.
    *
    * @defaultValue `0.5`
    */
   jitter?: number;
   /**
-   * Speed cap, units per second. Also what keeps chips from tunnelling through pegs.
+   * Top speed, in units per second. Keep it modest: it also stops fast chips from passing
+   * through pegs.
    *
    * @defaultValue `14`
    */
   maxSpeed?: number;
   /**
-   * Chips bounce off each other.
+   * Whether chips bounce off each other. When false, they pass through each other.
    *
    * @defaultValue `true`
    */
   chipCollisions?: boolean;
-  /** Base seed (an integer). Each drop derives its own stream from this. Random when omitted. */
+  /**
+   * An integer that fixes the board's randomness, for repeatable runs (tests, demos). Each drop
+   * gets its own seed derived from it, reported in `onLand` and `onMiss`. Random when omitted.
+   */
   seed?: number;
-  /** Slot id → weight. Above 1 pulls chips toward that slot, below 1 pushes them away. */
+  /**
+   * Nudges chips toward or away from slots: slot id → weight, a number ≥ 0. Above 1 pulls chips
+   * toward that slot, below 1 pushes them away, and 1 (the default for unlisted slots) does
+   * neither. The pull starts halfway down the board.
+   */
   bias?: Record<string, number>;
 }
 
