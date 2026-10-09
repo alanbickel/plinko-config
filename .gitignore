@@ -2,6 +2,7 @@
 NOTES.md
 DOCS-PLAN.md
 TODO.md
+A11y-audit.md
 
 # dependencies and build output
 node_modules/
