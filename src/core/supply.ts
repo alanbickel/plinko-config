@@ -20,15 +20,23 @@ export interface OnRequestRefill {
   mode: 'onRequest';
 }
 
-/** Chips trickle back on a timer, up to a cap. */
+/** Chips come back on a timer, a few at a time, up to a limit. */
 export interface IntervalRefill {
   /** Selects this policy. */
   mode: 'interval';
   /** Time between refills, in milliseconds. */
   everyMs: number;
-  /** Chips added per kind each interval. Default 1. */
+  /**
+   * Chips added to each kind per interval.
+   *
+   * @defaultValue `1`
+   */
   amount?: number;
-  /** Refills stop here. Default: each kind's starting count. */
+  /**
+   * Refills stop once a kind has this many chips.
+   *
+   * @defaultValue each kind's starting `count`
+   */
   max?: number;
 }
 
@@ -46,7 +54,10 @@ export interface SupplyInput {
   refill: ResolvedRefill;
 }
 
-/** Chips left per kind. A chip in hand counts as used. Unlimited kinds report Infinity. */
+/**
+ * Chips left per kind, as `onSupplyChange` and `board.supply.get()` report them. A chip the
+ * player is holding counts as used. Unlimited kinds report `Infinity`.
+ */
 export interface SupplySnapshot {
   /** Chip kind id → chips left. */
   counts: Record<string, number>;
@@ -64,7 +75,7 @@ export interface SetCount {
 export interface AddChips {
   /** The chip kind's id. */
   chip: string;
-  /** Chips to add. Negative removes chips. */
+  /** How many chips to add. A negative amount removes chips, stopping at 0. */
   amount: number;
 }
 

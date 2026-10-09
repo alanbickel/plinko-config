@@ -12,11 +12,11 @@ export interface LandingLabelInput extends ChipLabelInput {
   slot: SlotConfig<unknown>;
 }
 
-/** A kind and how many are left. */
+/** What the `selected` and `outOfChips` templates receive: a chip kind and how many are left. */
 export interface StockLabelInput extends ChipLabelInput {
-  /** Chips left; Infinity when unlimited. */
+  /** Chips left; `Infinity` when unlimited. */
   count: number;
-  /** Empty, and more can be requested. */
+  /** True when none are left and the player can request more (refill mode `'onRequest'`). */
   canRequest: boolean;
 }
 
@@ -28,52 +28,62 @@ export interface BatchLabelInput {
   missed: number;
 }
 
-/** A template for announcements about one chip. */
+/** A template for an announcement about one chip: it gets the chip kind and returns the text. */
 export type ChipLabel = (input: ChipLabelInput) => string;
 
-/** Every user-facing string. Functions are announcement templates; override any of them. */
+/**
+ * All of the board's text: what it draws, its ARIA attributes, and what it announces to screen
+ * readers. Function labels are templates: they get details about the chip (and slot) and return the
+ * text. Change any of them with the `labels` option, for wording or translation.
+ */
 export interface Labels {
-  /** aria-label of the canvas. */
+  /** The board's accessible name (the canvas's `aria-label`). */
   board: string;
-  /** What screen readers call the board (aria-roledescription). */
+  /** What screen readers call the kind of control the board is (`aria-roledescription`). */
   roleDescription: string;
-  /** Read once when the board gets focus (aria-describedby). */
+  /** How to play by keyboard, read when the board gets focus (`aria-describedby`). */
   instructions: string;
-  /** Tray selection changed, or the tray zone was entered. */
+  /** Announced when the player chooses another chip kind in the tray with the arrow keys. */
   selected: (input: StockLabelInput) => string;
-  /** A chip was picked up. */
+  /** Announced when a chip is picked up. */
   pickedUp: ChipLabel;
-  /** The held chip was put back in the tray. */
+  /** Announced when the held chip is put back in the tray. */
   cancelled: ChipLabel;
-  /** A chip was dropped in the drop zone and is falling. */
+  /** Announced when a chip is dropped and starts to fall. */
   dropped: ChipLabel;
-  /** The held chip was carried into the drop zone. */
+  /** Announced when the held chip moves into the drop zone. */
   enteredDropZone: string;
-  /** The held chip was carried out of the drop zone. */
+  /** Announced when the held chip moves out of the drop zone. */
   leftDropZone: string;
-  /** Dropped outside the drop zone: the chip is gone. */
+  /** Announced when a chip is dropped outside the drop zone and is lost. */
   fellOff: ChipLabel;
-  /** A chip landed in a slot. */
+  /** Announced when a chip lands in a slot. */
   landed: (input: LandingLabelInput) => string;
-  /** A chip came to rest without reaching a slot. */
+  /** Announced when a chip comes to rest without reaching a slot. */
   missed: ChipLabel;
-  /** Several settled close together (rapid fire), batched into one announcement. */
+  /**
+   * Announced instead of separate `landed` and `missed` messages when several chips come to rest
+   * close together.
+   */
   settledBatch: (input: BatchLabelInput) => string;
-  /** A kind has none left: the player tried to pick one up, or `autoReload` found it empty. */
+  /**
+   * Announced when the player tries to pick up a chip of an empty kind, or `autoReload` finds the
+   * kind empty.
+   */
   outOfChips: (input: StockLabelInput) => string;
-  /** A request for more chips was sent to the host. */
+  /** Announced when the player asks for more chips, while `onRequest` decides. */
   requesting: ChipLabel;
-  /** The host granted a request for more chips. */
+  /** Announced when a request for more chips is granted. */
   granted: ChipLabel;
-  /** The host denied a request for more chips. */
+  /** Announced when a request for more chips is denied. */
   denied: ChipLabel;
   /** Shown in the tray under an empty kind that can be requested. */
   requestMore: string;
-  /** Shown in the tray while a request waits for the host. */
+  /** Shown in the tray while `onRequest` decides on a request. */
   requestPending: string;
-  /** Too many chips in flight. */
+  /** Announced when a drop is refused because `maxInFlight` chips are already falling. */
   busy: string;
-  /** The board is full; shown on the board and announced. */
+  /** Shown on the board and announced when it locks (see `onFull`). */
   locked: string;
   /** Text of the "Powered by LittleJS" link (see the `attribution` option). */
   attribution: string;

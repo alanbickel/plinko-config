@@ -3,31 +3,36 @@
 
 import type { InputAction } from './actions';
 
-/** KeyboardEvent.key values per action. ' ' is the space bar. */
+/**
+ * The keys for each keyboard action, as lists of
+ * [`KeyboardEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key)
+ * values. `' '` is the space bar. Change them with the `keys` option.
+ */
 export interface KeyBindings {
   /** Choose the previous chip kind in the tray, or move the held chip left. */
   left: string[];
   /** Choose the next chip kind in the tray, or move the held chip right. */
   right: string[];
-  /** Carry the held chip up, toward the drop zone. */
+  /** Move the held chip up, from the tray toward the drop zone. */
   up: string[];
-  /** Carry the held chip down, toward the tray. */
+  /** Move the held chip down, toward the tray. */
   down: string[];
-  /** Jump to the left edge. */
+  /** Move the held chip to the left edge. */
   home: string[];
-  /** Jump to the right edge. */
+  /** Move the held chip to the right edge. */
   end: string[];
   /** Pick up the selected chip kind. On an empty kind that can be requested, ask for more. */
   pickUp: string[];
-  /** Drop the held chip. Outside the drop zone, the chip is lost. */
+  /** Drop the held chip. Dropped outside the drop zone, the chip is lost. */
   drop: string[];
   /** Put the held chip back in the tray. */
   cancel: string[];
 }
 
 /**
- * The built-in bindings: arrow keys to choose, carry, and aim; Home/End to jump to the edges;
- * Enter or Space to pick up and drop; Escape to put back. Shift with an arrow takes bigger steps.
+ * The built-in bindings: arrow keys to choose a chip kind and move the held chip; Home and End to
+ * jump to the edges; Enter or Space to pick up and drop; Escape to put the chip back. Shift with an
+ * arrow key takes bigger steps (see the `aimStep` and `liftStep` options).
  */
 export const DEFAULT_KEYS: KeyBindings = {
   left: ['ArrowLeft'],

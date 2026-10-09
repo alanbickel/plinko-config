@@ -10,7 +10,7 @@ import type {
 } from './types';
 import { check, inUnit, isFiniteNumber, isPositive } from './validate';
 
-/** The board shape used for every option you leave out of `board`. */
+/** The board shape used for every field you leave out of `board`. */
 export const DEFAULT_BOARD: Required<BoardConfig> = {
   rows: 8,
   pegRadius: 0.08,
@@ -20,8 +20,8 @@ export const DEFAULT_BOARD: Required<BoardConfig> = {
 };
 
 /**
- * The physics used for every option you leave out of `physics`. `seed` (random when omitted) and
- * `bias` (none) have no fixed default, so they aren't listed.
+ * The physics used for every field you leave out of `physics`. `seed` and `bias` aren't listed:
+ * without them, the seed is random and no slot is favoured.
  */
 export const DEFAULT_PHYSICS: Required<Omit<PhysicsConfig, 'seed' | 'bias'>> = {
   gravity: 45,
