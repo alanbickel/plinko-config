@@ -75,7 +75,8 @@ export default withMermaid({
     nav: [
       { text: 'Docs', link: '/guide/getting-started' },
       { text: 'API', link: '/api/' },
-      { text: 'Demo', link: '/demo' },
+      { text: 'Examples', link: '/examples' },
+      { text: 'Playground', link: '/playground' },
     ],
     sidebar: {
       '/guide/': docs,

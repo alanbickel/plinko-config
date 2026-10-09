@@ -55,3 +55,74 @@
   margin: 0;
   line-height: 1.5;
 }
+
+/* Examples page: each live board and result beside its code; stacked on narrow screens. */
+.examples-page {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 32px 24px 96px;
+}
+
+.example-item {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+@media (min-width: 960px) {
+  .example-item {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    align-items: start;
+  }
+}
+
+.example-board {
+  display: grid;
+  gap: 12px;
+}
+
+/* A height of its own: the board fits inside it, so a whole board shows without scrolling. */
+.example-host {
+  height: min(560px, 70vh);
+}
+
+.example-output {
+  padding: 12px 16px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  font-weight: 600;
+}
+
+/* The site's secondary button look, so it reads as a button in light and dark mode. */
+.example-restart {
+  justify-self: start;
+  padding: 6px 14px;
+  border: 1px solid var(--vp-c-border);
+  border-radius: 8px;
+  background: var(--vp-button-alt-bg);
+  color: var(--vp-button-alt-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.example-restart:hover {
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-button-alt-hover-bg);
+}
+
+/* The theme picker's preview card takes on the theme that landed. */
+.example-output[data-theme="light"] {
+  background: #ffffff;
+  color: #1f2933;
+}
+
+.example-output[data-theme="dark"] {
+  background: #11151c;
+  color: #e6e9ee;
+}
+
+/* System follows the visitor's device, so it keeps the site's own colors. */
+.example-output[data-theme="system"] {
+  border: 2px dashed var(--vp-c-brand-1);
+}
