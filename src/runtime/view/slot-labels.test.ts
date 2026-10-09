@@ -259,7 +259,7 @@ describe('planSlotLabels: layouts', () => {
     expect(pick({ ...long, asked: 'vertical' }).plan.mode).toBe('vertical');
   });
 
-  it('honours the layout exactly when horizontalWhenFit is off, and always for backboard', () => {
+  it('honors the layout exactly when horizontalWhenFit is off, and always for backboard', () => {
     expect(pick({ ...short, asked: 'vertical', strict: true }).plan.mode).toBe('vertical');
     expect(pick({ ...short, asked: 'angled', strict: true }).plan.mode).toBe('angled');
     expect(pick({ ...short, asked: 'backboard', strict: false }).plan.mode).toBe('backboard');

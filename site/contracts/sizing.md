@@ -4,7 +4,7 @@ description: How the board sizes itself to its target and the screen, and how sl
 
 # Sizing
 
-The board fills the target's width, but it's never taller than the screen. If the target has a height of its own, the board fits inside that too, centred. The board keeps its shape: its width and height always change together.
+The board fills the target's width, but it's never taller than the screen. If the target has a height of its own, the board fits inside that too, centered. The board keeps its shape: its width and height always change together.
 
 ## The screen limit
 

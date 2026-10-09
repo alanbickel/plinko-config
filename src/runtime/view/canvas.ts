@@ -486,7 +486,7 @@ class Painter {
     this.line({ text: message, style, size: banner.size, maxWidth: viewport.w - 0.4, at });
   }
 
-  /** One centred line: shrunk to fit (never below the minimum size), then cut with "…". */
+  /** One centered line: shrunk to fit (never below the minimum size), then cut with "…". */
   private line({ text, style, size, maxWidth, at }: LineInput): void {
     const { g } = this.input;
     const minSize = this.input.plan.minSize;
@@ -533,7 +533,7 @@ interface StyledText {
 }
 
 interface TrayTextInput {
-  /** Centre of the tray kind's column, board units. */
+  /** Center of the tray kind's column, board units. */
   x: number;
   /** Width of the column, board units. */
   cell: number;

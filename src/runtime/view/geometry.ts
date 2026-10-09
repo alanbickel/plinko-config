@@ -7,7 +7,7 @@ export const SIDE = 0.25; // margin left and right of the walls
 const TOP = 0.9; // space above the drop line for the held chip
 export const FLOOR = 0.15;
 
-/** Tray chips' centre, below the top of the tray. */
+/** Tray chips' center, below the top of the tray. */
 export const TRAY_CHIP_DY = 0.65;
 /** Tray chips' radius. */
 export const TRAY_CHIP_R = 0.32;
@@ -40,7 +40,7 @@ export interface GeometryInput {
 export function computeViewport({ layout, strip, trayHeight }: GeometryInput): Viewport {
   const y0 = layout.spawnY - TOP;
   const trayY = layout.floorY + FLOOR + strip.height;
-  // The label room is mirrored on the left so the board stays centred.
+  // The label room is mirrored on the left so the board stays centered.
   const side = SIDE + strip.extraRight;
   return { x0: -side, y0, w: layout.width + 2 * side, h: trayY + trayHeight - y0, trayY };
 }
@@ -103,7 +103,7 @@ export function bannerLayout({ unit, remPx }: TextScale): BannerLayout {
 }
 
 /**
- * The vertical path of a held chip: lift 0 is the tray chips' centre, lift 1 the drop line. The
+ * The vertical path of a held chip: lift 0 is the tray chips' center, lift 1 the drop line. The
  * drop zone is the band above the first peg row, where a chip clears every peg.
  */
 export interface CarryPath {

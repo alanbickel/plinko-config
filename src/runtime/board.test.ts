@@ -91,7 +91,7 @@ describe('mounting', () => {
     expect(host.children).toHaveLength(0);
   });
 
-  it('makes the canvas a labelled, described, focusable application', () => {
+  it('makes the canvas a labeled, described, focusable application', () => {
     const b = mount();
     const canvas = canvasOf(b);
     expect(canvas.tabIndex).toBe(0);
@@ -180,7 +180,7 @@ describe('keyboard', () => {
     expect(press(b, { key: 'Enter', ctrlKey: true }).defaultPrevented).toBe(false);
   });
 
-  it('honours custom bindings and step sizes', () => {
+  it('honors custom bindings and step sizes', () => {
     const onDrop = vi.fn();
     const b = mount({ keys: { drop: ['d'] }, aimStep: 0.01, liftStep: 1, onDrop });
     press(b, 'Enter');

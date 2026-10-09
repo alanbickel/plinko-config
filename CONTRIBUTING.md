@@ -110,7 +110,7 @@ function nudge(dx: number) {
 
 ### 4. Look up, don't branch
 
-Choosing between behaviours is a job for a map, not `if/else` or `switch`. `if/else` is a yellow flag; a lone guard clause (rule 3) is fine.
+Choosing between behaviors is a job for a map, not `if/else` or `switch`. `if/else` is a yellow flag; a lone guard clause (rule 3) is fine.
 
 Type the map so every case must be handled. In this codebase, `HandlerMap` and `dispatchByType` (`src/runtime/dispatch.ts`) do this for any union with a "by type" interface.
 
@@ -185,7 +185,7 @@ type WorldEvent = LandedEvent | MissedEvent;
 - The coding standards apply to tests too. Biome skips the length check there, since a `describe` block groups many tests; keep each test itself within the rule of 30.
 - Physics changes come with before/after numbers from `npm run sim`.
 - Tests should be able to fail. For the sizing and label code, `scripts/sabotage.ts` checks this: each patch plants one bug and names the tests that must catch it. Add a patch when you add a rule.
-- Some docs pages state behaviour a spec checks. Change the page and the spec together:
+- Some docs pages state behavior a spec checks. Change the page and the spec together:
 
   | Page | Spec |
   |---|---|

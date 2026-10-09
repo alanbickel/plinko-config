@@ -4,7 +4,7 @@ description: How the board measures the screen and its target, and when it refit
 
 # Sizing internals
 
-The behaviour is described in [Sizing](../contracts/sizing). This page covers how it's measured. The code is in `src/runtime/sizing.ts`, `src/runtime/observe.ts`, and `src/runtime/view/slot-labels.ts`.
+The behavior is described in [Sizing](../contracts/sizing). This page covers how it's measured. The code is in `src/runtime/sizing.ts`, `src/runtime/observe.ts`, and `src/runtime/view/slot-labels.ts`.
 
 ## Fitting
 
@@ -24,7 +24,7 @@ The root font size is measured at every fit, from a hidden ruler 1rem wide (see 
 
 `planSlotLabels()` (in `src/runtime/view/slot-labels.ts`) is a pure function of the canvas width and the root font size. It works in CSS pixels, then converts the plan to board units for drawing. Each label's width is measured once at size 1, when the labels or their fonts change, and scaled from there: text width is proportional to font size.
 
-- **Board width.** The board gets the canvas width minus the room angled labels need past the walls (mirrored on the left, so the board stays centred): `unit = (cssWidth − 2 × extra) ÷ (slots + 2 × side)`. The room needed shrinks as the unit grows, since the last label starts inside its slot, so this is solved in closed form.
+- **Board width.** The board gets the canvas width minus the room angled labels need past the walls (mirrored on the left, so the board stays centered): `unit = (cssWidth − 2 × extra) ÷ (slots + 2 × side)`. The room needed shrinks as the unit grows, since the last label starts inside its slot, so this is solved in closed form.
 - **Strip cap.** Vertical and angled strips stop at half the board's height from the drop line to the floor.
 - **Apart.** Neighbouring labels need 1.1 text sizes between them: the slot width for vertical and backboard labels, slot width × sin 40° for angled ones.
 - **Shrink, then cut.** Labels that don't fit the cap, or don't stay apart, shrink toward the floor; at the floor they're cut. Smaller text means a shorter strip and a wider board, so the largest size (or run) that fits is found by halving, 40 times. When even floor-size text can't stay apart, labels stay at the floor and overlap.

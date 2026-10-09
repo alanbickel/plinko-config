@@ -35,7 +35,7 @@ describe('createRng', () => {
     for (const n of buckets) expect(Math.abs(n - 10_000)).toBeLessThan(500);
   });
 
-  it('normalises the seed to an unsigned 32-bit integer', () => {
+  it('normalizes the seed to an unsigned 32-bit integer', () => {
     expect(createRng(-1).seed).toBe(2 ** 32 - 1);
   });
 });

@@ -35,7 +35,7 @@ test('fits inside a host that has its own height, and refits on resize', async (
     if (!host || !box) throw new Error('not laid out');
     expect(box.width).toBeLessThanOrEqual(host.width + 1);
     expect(box.height).toBeLessThanOrEqual(host.height + 1);
-    // Whole board visible, centred horizontally in the host.
+    // Whole board visible, centered horizontally in the host.
     expect(Math.abs(box.x + box.width / 2 - (host.x + host.width / 2))).toBeLessThan(2);
     return box;
   };

@@ -120,7 +120,7 @@ function createAttribution({ doc, labels }: Maker): HTMLAnchorElement {
   link.rel = 'noopener';
   link.target = '_blank';
   link.setAttribute('part', 'attribution');
-  // Centred under the canvas like the canvas itself; sizing.ts gives it the canvas's width, so the
+  // Centered under the canvas like the canvas itself; sizing.ts gives it the canvas's width, so the
   // credit sits under the board's right edge however wide the host is.
   link.style.cssText = 'display:block;margin:0.25em auto 0;font-size:0.75em;text-align:right';
   return link;

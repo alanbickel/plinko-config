@@ -176,7 +176,7 @@ function styles(config: PlaygroundConfig): Styles {
 
 const SLOW_MS = 2000;
 
-/** The playground's onRequest, per the chosen behaviour. */
+/** The playground's onRequest, per the chosen behavior. */
 export function answerRequest(behaviour: RequestBehaviour): Promise<RequestAnswer> {
   const answers: Record<RequestBehaviour, () => Promise<RequestAnswer>> = {
     grant: async () => 'grant',

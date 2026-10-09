@@ -1,5 +1,5 @@
 ---
-description: Keyboard controls, screen-reader announcements, focus, reduced motion, and touch behaviour.
+description: Keyboard controls, screen-reader announcements, focus, reduced motion, and touch behavior.
 ---
 
 # Accessibility

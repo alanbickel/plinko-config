@@ -72,7 +72,7 @@ function histogram(world: World, xs: Iterable<number>): number[] {
 interface FlightStats {
   /** Steps the chip spent outside the board's walls or below its floor. */
   outside: number;
-  /** Closest any step brought the chip's centre to a peg's centre. */
+  /** Closest any step brought the chip's center to a peg's center. */
   closest: number;
 }
 
@@ -168,7 +168,7 @@ describe('World: single drops', () => {
 });
 
 describe('World: distribution', () => {
-  it('spreads centre drops in a bell shape', () => {
+  it('spreads center drops in a bell shape', () => {
     const world = makeWorld({ keepLanded: false });
     const counts = histogram(world, new Array(2000).fill(0.5));
     const share = counts.map((n) => n / 2000);
@@ -189,7 +189,7 @@ describe('World: distribution', () => {
 
 describe('World: piles and full board', () => {
   it('fills a slot, then overflows into its neighbours', () => {
-    // One row of boundary pegs: centre drops fall straight into the middle slot until it's full.
+    // One row of boundary pegs: center drops fall straight into the middle slot until it's full.
     const world = makeWorld({ slots: 5, board: { rows: 1 } });
     const results: ChipBody[] = [];
     for (let i = 0; i < 20; i++) results.push(dropOne(world, 0.5).chip);
@@ -231,7 +231,7 @@ describe('World: piles and full board', () => {
   });
 
   it('reports overflow when a chip settles at the drop line before every slot fills', () => {
-    // Many narrow-ish slots and a single drop point: the centre tower reaches the top
+    // Many narrow-ish slots and a single drop point: the center tower reaches the top
     // long before the far slots fill.
     const world = makeWorld({ slots: 30, board: { rows: 1 } });
     for (let i = 0; i < 2000 && !world.full; i++) dropOne(world, 0.5);

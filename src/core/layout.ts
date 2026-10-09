@@ -71,7 +71,7 @@ interface BoardShape {
 
 interface RowSpec extends BoardShape {
   y: number;
-  /** x of the first peg: slot boundaries (1) or slot centres (0.5). */
+  /** x of the first peg: slot boundaries (1) or slot centers (0.5). */
   startX: number;
 }
 
@@ -104,7 +104,7 @@ export function buildLayout(slotCount: number, board: ResolvedBoard): Layout {
 }
 
 /**
- * Rows alternate between pegs at slot centres (x.5) and pegs on slot boundaries (integers). The
+ * Rows alternate between pegs at slot centers (x.5) and pegs on slot boundaries (integers). The
  * last row sits on the boundaries, directly above the rails.
  */
 function buildPegField(shape: BoardShape): PegField {

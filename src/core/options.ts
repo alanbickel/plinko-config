@@ -21,7 +21,7 @@ export const DEFAULT_BOARD: Required<BoardConfig> = {
 
 /**
  * The physics used for every field you leave out of `physics`. `seed` and `bias` aren't listed:
- * without them, the seed is random and no slot is favoured.
+ * without them, the seed is random and no slot is favored.
  */
 export const DEFAULT_PHYSICS: Required<Omit<PhysicsConfig, 'seed' | 'bias'>> = {
   gravity: 45,

@@ -85,7 +85,7 @@ describe('Supply: refill policies', () => {
     expect(s.snapshot().counts).toEqual({ on: 2, off: Infinity });
   });
 
-  it('interval refill honours amount and max', () => {
+  it('interval refill honors amount and max', () => {
     const s = empty({ mode: 'interval', everyMs: 1000, amount: 3, max: 5 });
     s.refillOnce();
     s.refillOnce();

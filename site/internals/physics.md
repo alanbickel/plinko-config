@@ -16,7 +16,7 @@ All distances are in board units: one unit is the horizontal spacing between peg
 
 `buildLayout()` (`src/core/layout.ts`) turns the slot count and the `board` option into pegs, walls, rails, and a floor.
 
-- **Pegs** sit in rows of an equilateral triangle lattice. Rows alternate between pegs over slot centres and pegs over slot boundaries. The last row sits over the boundaries, directly above the rails.
+- **Pegs** sit in rows of an equilateral triangle lattice. Rows alternate between pegs over slot centers and pegs over slot boundaries. The last row sits over the boundaries, directly above the rails.
 - **No traps.** A peg too close to a wall for a chip to pass would trap chips, so it becomes a half-round bump set into the wall instead. The bumps also stop chips from sliding straight down the walls.
 - **Rails** divide the slots. Each has a rounded cap, so chips roll off it instead of balancing on top.
 - **The drop line** is above the first peg row. Chips spawn there.
@@ -27,7 +27,7 @@ Each step does the same five things, in order, for the chips in flight:
 
 1. **Move.** Apply gravity, plus any `bias` pull below the middle of the peg field, and cap the speed at `maxSpeed`. The cap also stops chips passing through pegs.
 2. **Collide with the board.** Push the chip out of any peg, cap, bump, settled chip, wall, rail, or floor it overlaps, and bounce it (`restitution`, `friction`). A real hit on a peg, cap, or bump adds a random sideways kick of up to `jitter`; a hit on a peg also counts toward `pegHits` and emits a `pegHit` event.
-3. **Roll off round things.** A chip resting on a peg, cap, bump, or settled chip, rather than hitting it, gets a small push away from its centre. Resting on something round is an unstable balance, and this is also how chips spill off an overflowing pile into the next slot.
+3. **Roll off round things.** A chip resting on a peg, cap, bump, or settled chip, rather than hitting it, gets a small push away from its center. Resting on something round is an unstable balance, and this is also how chips spill off an overflowing pile into the next slot.
 4. **Collide chips with each other**, if `chipCollisions` is on, as equal-mass circles.
 5. **Check for rest**, below.
 
@@ -39,7 +39,7 @@ A chip counts as still once it stays within a small radius of one spot, however 
 
 | Still for | Where | Result |
 |---|---|---|
-| 24 steps (0.2 s) | Any part below the rail tops | **Landed**, in the slot under its centre |
+| 24 steps (0.2 s) | Any part below the rail tops | **Landed**, in the slot under its center |
 | 24 steps | On top of a settled chip, above the rails | **Missed** |
 | 90 steps (0.75 s) | Anywhere else, such as balanced on a peg | **Nudged**: a small kick up and to one side |
 | 90 steps, after 3 nudges | Anywhere | **Missed** |
