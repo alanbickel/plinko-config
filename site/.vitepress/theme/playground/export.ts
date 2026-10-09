@@ -117,8 +117,11 @@ const CALLBACKS = `  onLand: ({ chip, slot }) => {
     // A chip landed: save the preference (e.g. slot.id is now chip.label).
   },`;
 
-const REQUEST_CALLBACK = `  onRequest: async ({ chip }) => {
-    // Someone asked for more chips: answer 'grant' or 'deny'.
+// Not async: TypeScript infers `async () => { return 'grant'; }` as Promise<string>, which
+// onRequest's type rejects, and the export stays plain JavaScript (no annotations).
+const REQUEST_CALLBACK = `  onRequest: ({ chip }) => {
+    // Someone asked for more chips: answer 'grant' or 'deny'
+    // (or a promise of one, to ask a server first).
     return 'grant';
   },`;
 
