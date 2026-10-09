@@ -268,8 +268,11 @@ function withEvents<CV, SV>(
 }
 
 /**
- * Registers the element under a tag name, once. Other names get their own subclass, since one
- * class can't be registered twice.
+ * Registers the element under `tag`. Importing `plinko-config/element` already registers
+ * `plinko-board`; call this to use another name as well. Does nothing if the name is taken, or
+ * outside a browser.
+ *
+ * @param tag - A custom element name (it must contain a hyphen).
  */
 export function definePlinkoBoard(tag = 'plinko-board'): void {
   if (typeof customElements === 'undefined' || customElements.get(tag)) return;

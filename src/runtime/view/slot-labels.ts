@@ -7,20 +7,28 @@ import { fontOf, type ResolvedText } from '../styles';
 import { LABEL_REM, type LabelStrip, MIN_TEXT_REM, SIDE } from './geometry';
 
 /**
- * Where slot labels go. `'horizontal'`: one line under each slot. `'vertical'`: under each slot,
- * reading top to bottom. `'backboard'`: printed on each slot's back wall, behind the chips.
- * `'angled'`: under each slot, slanting down to the right.
+ * Where slot labels go:
+ * - `'horizontal'`: one line under each slot.
+ * - `'vertical'`: under each slot, reading top to bottom.
+ * - `'backboard'`: printed on each slot's back wall, behind the chips.
+ * - `'angled'`: under each slot, slanting down to the right.
  */
 export type SlotLabelLayout = 'horizontal' | 'vertical' | 'backboard' | 'angled';
 
-/** How slot labels are laid out, for the whole board. */
+/** The `slotLabels` option: how slot labels are laid out, for the whole board. */
 export interface SlotLabelOptions {
-  /** Default `'vertical'`. */
+  /**
+   * Where the labels go; see {@link SlotLabelLayout}.
+   *
+   * @defaultValue `'vertical'`
+   */
   layout?: SlotLabelLayout;
   /**
-   * Use one horizontal line under each slot while every label fits at the normal size, and the
-   * chosen layout only when one doesn't. Default true. Ignored for `'horizontal'` and
-   * `'backboard'`. Set false to always use `layout` as given.
+   * Use one horizontal line under each slot while every label fits at full size, and switch to
+   * `layout` only when one doesn't. Has no effect with `'horizontal'` or `'backboard'`. Set it to
+   * false to always use `layout`.
+   *
+   * @defaultValue `true`
    */
   horizontalWhenFit?: boolean;
 }

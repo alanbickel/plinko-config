@@ -4,37 +4,61 @@
 import { check } from '../core/validate';
 import type { Theme } from './theme';
 
-/** How a piece of canvas text looks. Its size is fitted to the space, so it isn't styleable. */
+/**
+ * How a piece of the board's text looks. There's no size: the board sizes text in rem, so it
+ * follows the page's font size. Slot labels that don't fit shrink, down to 0.75rem, and are then
+ * shortened with an ellipsis.
+ */
 export interface TextStyle {
-  /** Any CSS colour. */
+  /** Any CSS color. */
   color?: string;
-  /** A CSS font-family list, e.g. "Inter, sans-serif". */
+  /** A CSS font-family list, such as `"Inter, sans-serif"`. */
   fontFamily?: string;
-  /** A CSS font-weight, e.g. 600 or "bold". */
+  /** A CSS font-weight, such as `600` or `'bold'`. */
   fontWeight?: string | number;
 }
 
 /** How one slot looks. */
 export interface SlotStyle {
-  /** Tint behind the slot's column, from the rail tops to the floor (any CSS colour; use alpha for subtlety). */
+  /**
+   * A tint behind the slot's column, from the rail tops to the floor. Any CSS color; a
+   * translucent one keeps pegs and chips easy to see.
+   */
   fill?: string;
-  /** The slot's label under the board. */
+  /** The slot's label, wherever `slotLabels` puts it. */
   label?: TextStyle;
 }
 
 /** How one chip kind looks, on the board and in the tray. */
 export interface ChipStyle {
-  /** The chip's colour (any CSS colour), on the board and in the tray. Defaults to the theme's `chip`. */
+  /**
+   * The chip's color (any CSS color), on the board and in the tray.
+   *
+   * @defaultValue the theme's `chip`
+   */
   fill?: string;
-  /** Outline, so chips stay distinct from each other and the background. */
+  /**
+   * The chip's outline, which keeps chips distinct from each other and the background.
+   *
+   * @defaultValue the theme's `chipStroke`
+   */
   stroke?: string;
-  /** The kind's caption in the tray. Its colour shows while the kind is selected; others are muted. */
+  /**
+   * The kind's caption in the tray. Its color is used while the kind is selected; the other
+   * captions use the theme's `mutedText`.
+   */
   label?: TextStyle;
 }
 
-/** Per-item looks, keyed by slot and chip id. Anything left out falls back to the theme. */
+/**
+ * The `styles` option: fonts for the board's text, and looks for particular slots and chip kinds
+ * (keyed by id). Anything left out comes from the theme.
+ */
 export interface Styles {
-  /** Every canvas text: slot labels, tray captions and notes, the full-board banner. */
+  /**
+   * Font and color for all of the board's text: slot labels, tray captions and notes, and the
+   * full-board banner. A slot's or chip kind's own `label` style overrides it.
+   */
   text?: TextStyle;
   /** Looks for particular slots, keyed by slot id. Slots not listed keep the theme. */
   slots?: Record<string, SlotStyle>;
@@ -63,7 +87,7 @@ export interface ResolvedChipStyle {
 
 export interface ResolvedStyles {
   text: ResolvedText;
-  /** Muted text (unselected kinds, notes) keeps the theme's colour, in the board-wide font. */
+  /** Muted text (unselected kinds, notes) keeps the theme's color, in the board-wide font. */
   mutedText: ResolvedText;
   /** By slot index. */
   slots: ResolvedSlotStyle[];

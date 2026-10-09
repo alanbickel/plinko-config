@@ -1,4 +1,11 @@
-/** Colours for the canvas. Resolved from options.theme, then --plinko-* CSS properties, then defaults. */
+/**
+ * The board's colors, as CSS color strings. Each comes from the `theme` option; failing that,
+ * from a CSS custom property on the target element, named `--plinko-` plus the key in kebab case
+ * (`chipStroke` → `--plinko-chip-stroke`); failing that, from {@link DEFAULT_THEME}.
+ *
+ * CSS properties are read when the board is created and on each `board.update()`. After changing
+ * them (say, for a dark mode switch), call `board.update({})` to repaint.
+ */
 export interface Theme {
   /** Behind the board. */
   background: string;
@@ -10,7 +17,7 @@ export interface Theme {
   pegHit: string;
   /** The rails between slots. */
   rail: string;
-  /** Chips whose kind has no colour. */
+  /** Chips whose kind has no color. */
   chip: string;
   /** Chip outline, so chips stay distinct from each other and the background. */
   chipStroke: string;
@@ -28,7 +35,10 @@ export interface Theme {
   overlay: string;
 }
 
-/** The built-in dark theme. Its text and focus colours meet WCAG AA contrast (≥ 4.5:1). */
+/**
+ * The built-in dark theme. Its `text`, `mutedText` and `focus` colors have a contrast ratio of
+ * at least 7:1 against both `background` and `tray`.
+ */
 export const DEFAULT_THEME: Theme = {
   background: '#11151c',
   wall: '#3b4553',
