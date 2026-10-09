@@ -79,7 +79,7 @@ Arrows are calls. What comes back (notices from the state machine, events from t
 | `supply.ts`, `lock.ts` | Reporting chip counts, interval refills, requests to the host, locking the board | Count chips itself |
 | `sizing.ts`, `observe.ts` | Fitting the board, and watching size and visibility. See [Sizing internals](./sizing). | |
 | `motion.ts` | The `motion` option and the visitor's reduced-motion setting | |
-| `config.ts`, `labels.ts`, `theme.ts`, `look.ts`, `styles.ts` | Runtime options: labels, colours, fonts, per-slot and per-chip styles | |
+| `config.ts`, `labels.ts`, `theme.ts`, `look.ts`, `styles.ts` | Runtime options: labels, colors, fonts, per-slot and per-chip styles | |
 | `view/canvas.ts`, `view/geometry.ts`, `view/slot-labels.ts` | Drawing the board, tray, chips, and slot labels | Change state |
 | `view/dom.ts` | The wrapper and its few DOM nodes | Change state |
 | `view/a11y.ts` | The live region announcements are spoken through | Decide when something happened |

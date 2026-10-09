@@ -59,7 +59,7 @@ export interface ControlsDraft {
   liftStepLarge: number | null;
 }
 
-/** The board's colours: the library's built-in dark theme, or the playground's light one. */
+/** The board's colors: the library's built-in dark theme, or the playground's light one. */
 export type ThemeChoice = 'dark' | 'light';
 
 /** For light pages. Text, muted text and focus meet WCAG AA (≥ 4.5:1) on the background and tray. */

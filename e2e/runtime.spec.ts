@@ -15,8 +15,8 @@ const focusIsCanvas = (page: Page) =>
 
 test('draws the board', async ({ page }) => {
   await mountBoard(page, { host: 'fixed' });
-  // A blank or failed canvas has one colour; the board has background, pegs, walls, chips, text.
-  const colours = await canvas(page).evaluate((el: HTMLCanvasElement) => {
+  // A blank or failed canvas has one color; the board has background, pegs, walls, chips, text.
+  const colors = await canvas(page).evaluate((el: HTMLCanvasElement) => {
     const { data } = el.getContext('2d')?.getImageData(0, 0, el.width, el.height) ?? { data: [] };
     const seen = new Set<number>();
     for (let i = 0; i < data.length; i += 4 * 97) {
@@ -24,7 +24,7 @@ test('draws the board', async ({ page }) => {
     }
     return seen.size;
   });
-  expect(colours).toBeGreaterThan(5);
+  expect(colors).toBeGreaterThan(5);
 });
 
 test('fits inside a host that has its own height, and refits on resize', async ({ page }) => {

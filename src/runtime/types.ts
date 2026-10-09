@@ -168,7 +168,7 @@ export interface PlinkoOptions<CV = unknown, SV = unknown> extends CoreOptions<C
   /** Keyboard bindings to change. Actions you leave out keep {@link DEFAULT_KEYS}. */
   keys?: Partial<KeyBindings>;
   /**
-   * Colours to change. Colours you leave out come from `--plinko-*` CSS custom properties if the
+   * Colors to change. Colors you leave out come from `--plinko-*` CSS custom properties if the
    * page sets them, otherwise from {@link DEFAULT_THEME}.
    */
   theme?: Partial<Theme>;

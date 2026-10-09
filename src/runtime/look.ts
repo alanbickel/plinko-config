@@ -1,4 +1,4 @@
-// The board's colours and fonts: the theme (options, then --plinko-* CSS properties, then
+// The board's colors and fonts: the theme (options, then --plinko-* CSS properties, then
 // defaults) with per-slot and per-chip styles layered on top. Resolved at mount and on update().
 
 import { resolveStyles } from './styles';

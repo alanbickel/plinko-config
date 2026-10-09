@@ -10,7 +10,7 @@ The whole game can be played with a keyboard, and every important moment is anno
 
 The board is a single tab stop: the canvas. It has `role="application"`, a role description from `labels.roleDescription` (what screen readers call it, `"game"` by default), a name from `labels.board`, and a description from `labels.instructions` that's read once when it gets focus.
 
-The board never handles Tab or keys pressed with Ctrl, Alt, or Meta, so focus can always move on. The focus ring is drawn on the canvas in the theme's `focus` colour. It's hidden after a mouse or touch interaction and comes back on the next key press.
+The board never handles Tab or keys pressed with Ctrl, Alt, or Meta, so focus can always move on. The focus ring is drawn on the canvas in the theme's `focus` color. It's hidden after a mouse or touch interaction and comes back on the next key press.
 
 ## Keyboard
 
@@ -81,6 +81,6 @@ For background, see [WCAG 2.2: Animation from Interactions](https://www.w3.org/W
 
 The canvas sets `touch-action: none`, so dragging a chip never scrolls the page. The board, tray included, never grows taller than the screen, and picking up a chip scrolls the whole board into view.
 
-## Colour
+## Color
 
-The default theme's text and focus colours meet WCAG AA contrast (at least 4.5:1) against its background. If you change colours with `theme` or `styles`, check their contrast too.
+The default theme's text and focus colors meet WCAG AA contrast (at least 4.5:1) against its background. If you change colors with `theme` or `styles`, check their contrast too.

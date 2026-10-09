@@ -210,7 +210,7 @@ const tint = (hex: string) => `${hex}40`;
 
         <details>
           <summary>Chips <small>remount</small></summary>
-          <p class="note">Colours are live.</p>
+          <p class="note">Colors are live.</p>
           <div v-for="(chip, i) in config.chips" :key="chip.id" class="row">
             <input v-model="chip.label" :aria-label="`Chip ${i + 1} label`" />
             <input
@@ -222,7 +222,7 @@ const tint = (hex: string) => `${hex}40`;
               :aria-label="`${chip.label} count (empty for unlimited)`"
               @change="setCount(i, ($event.target as HTMLInputElement).value)"
             />
-            <input v-model="chip.fill" type="color" :aria-label="`${chip.label} colour`" />
+            <input v-model="chip.fill" type="color" :aria-label="`${chip.label} color`" />
             <button type="button" :disabled="config.chips.length <= 1" :aria-label="`Remove chip ${chip.label}`" @click="config.chips.splice(i, 1)">×</button>
           </div>
           <button type="button" class="add" :disabled="config.chips.length >= 6" @click="addChip">+ Chip</button>
@@ -357,7 +357,7 @@ const tint = (hex: string) => `${hex}40`;
           <summary>Theme <small>live</small></summary>
           <p class="note">Starts with the page's theme and follows its toggle.</p>
           <label class="field">
-            Colours
+            Colors
             <select v-model="config.theme">
               <option value="dark">Dark (library default)</option>
               <option value="light">Light</option>

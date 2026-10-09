@@ -108,7 +108,7 @@ export interface CanvasViewInput {
   reducedMotion: boolean;
 }
 
-/** Everything that decides colours and fonts; replaced as a whole by board.update(). */
+/** Everything that decides colors and fonts; replaced as a whole by board.update(). */
 export interface Look {
   theme: Theme;
   styles: ResolvedStyles;
@@ -227,7 +227,7 @@ export class CanvasView {
     this.painter?.paint(frame);
   }
 
-  /** New colours and fonts from the next frame on (board.update). True if the board must refit. */
+  /** New colors and fonts from the next frame on (board.update). True if the board must refit. */
   setLook(look: Look): boolean {
     this.input = { ...this.input, ...look };
     this.painter?.setLook(look);
