@@ -4,7 +4,7 @@ description: Keyboard controls, screen-reader announcements, focus, reduced moti
 
 # Accessibility
 
-The whole game can be played with a keyboard, and every important moment is announced to screen readers. The text players see and hear comes from two places: the `label` on each item in `chips` and `slots` (shown in the tray and under the slots, and spoken in announcements), and the board's own wording in the `labels` option.
+The whole game can be played with a keyboard, or by tapping instead of dragging. The board announces what happens to screen readers: picking a chip up, carrying it into the drop zone, the slot under it, and where it lands (see [Announcements](#announcements)). The text players see and hear comes from two places: the `label` on each item in `chips` and `slots` (shown in the tray and on the board, and spoken in announcements), and the board's own wording in the `labels` option.
 
 ## Focus
 
@@ -92,4 +92,4 @@ The canvas sets `touch-action: none`, so dragging a chip never scrolls the page.
 
 ## Color
 
-The default theme's text and focus colors meet WCAG AA contrast (at least 4.5:1) against its background. If you change colors with `theme` or `styles`, check their contrast too.
+In the default theme, the `text`, `mutedText`, and `focus` colors have a contrast ratio of at least 7:1 against both `background` and `tray`. Pegs, rails, chips, and the drop zone are at least 3:1 against `background`. If you change colors with `theme` or `styles`, check their contrast too. For background, see [WCAG 2.2: Contrast (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) and [Non-text Contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html).
