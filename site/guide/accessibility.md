@@ -78,7 +78,15 @@ With reduced motion:
 
 For background, see [WCAG 2.2: Animation from Interactions](https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html).
 
-## Touch
+## Touch and mouse
+
+Players can drag a chip, or tap instead, with no drag needed:
+
+- Tap a tray chip to pick it up.
+- Tap in the drop zone to drop it there, or tap the tray to put it back. A tap anywhere else on the board loses the chip, as releasing a drag there does.
+- After a tap pickup, a drag also works: press anywhere, move, and release.
+
+Taps and drags fire the same callbacks and announcements as each other. For background, see [WCAG 2.2: Dragging Movements](https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html).
 
 The canvas sets `touch-action: none`, so dragging a chip never scrolls the page. The board, tray included, never grows taller than the screen, and picking up a chip scrolls the whole board into view.
 

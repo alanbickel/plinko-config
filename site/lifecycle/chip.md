@@ -40,19 +40,19 @@ When a kind has none left, picking it up is refused and announced. If the refill
 
 A board holds at most one chip at a time. The held chip has two positions, both from 0 to 1: `x`, across the board, and `lift`, from the tray (0) up to the drop line (1). It starts in the tray and has to be carried up into the **drop zone**, the band above the first row of pegs, before it can be dropped. While a chip is held, the drop zone is outlined; while the chip is inside it, the zone is lit.
 
-Visitors carry the chip with the keyboard or by dragging; see [Accessibility](../guide/accessibility#keyboard) for the controls. Your code uses the handle instead: `pickUp(kind)`, `aim(x)`, and `cancel()`.
+Visitors carry the chip with the keyboard, by dragging, or by tapping: tap a tray chip to pick it up, then tap where to drop it. See [Accessibility](../guide/accessibility#keyboard) for the keyboard controls and [Touch and mouse](../guide/accessibility#touch-and-mouse) for pointers. Your code uses the handle instead: `pickUp(kind)`, `aim(x)`, and `cancel()`.
 
 ## Dropping
 
 A chip dropped inside the drop zone starts falling, and `onDrop` fires. A board allows `maxInFlight` chips in flight at once. A drop past that limit is refused and announced, and the chip stays held.
 
-With `autoReload` on, a keyboard drop picks up the next chip of the same kind, at the same position, so a visitor can drop several in a row. A drag doesn't reload, because the finger or mouse button has already let go.
+With `autoReload` on, a keyboard drop picks up the next chip of the same kind, at the same position, so a visitor can drop several in a row. A drag or tap doesn't reload, because the finger or mouse button has already let go.
 
 `board.drop()` carries the chip straight into the drop zone, picking it up first if nothing is held, and returns a promise. The promise rejects if the drop is refused.
 
 ## Falling off the board
 
-A chip dropped outside the drop zone, or a drag released anywhere other than the tray or the drop zone, falls off the bottom of the board. With reduced motion, it fades out instead. The chip is spent: `onSupplyChange` reports it, and the announcer says it fell off. `onDrop`, `onLand`, and `onMiss` don't fire, and it never reloads.
+A chip dropped outside the drop zone, or a drag released or second tap anywhere other than the tray or the drop zone, falls off the bottom of the board. With reduced motion, it fades out instead. The chip is spent: `onSupplyChange` reports it, and the announcer says it fell off. `onDrop`, `onLand`, and `onMiss` don't fire, and it never reloads.
 
 Only visitors can lose chips this way. `board.drop()` always reaches the drop zone.
 

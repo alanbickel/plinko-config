@@ -18,7 +18,7 @@ Give `createPlinko` a target element (or a selector) and two lists: the **slots*
 
 <<< ../examples/getting-started.ts#mount
 
-Players pick up a chip, aim it, and drop it with the keyboard, or drag it with a mouse or finger.
+Players pick up a chip, aim it, and drop it with the keyboard, or drag or tap it with a mouse or finger.
 
 ## Clean up
 

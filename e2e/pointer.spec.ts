@@ -3,7 +3,7 @@ import { countOf, expect, mountBoard, test } from './fixtures';
 
 // The default harness board (five slots; On and Off chips). Taps are real touch input on the
 // mobile project and clicks on desktop. Playwright can't drag by touch, so drags use the mouse
-// (desktop only); the user checks touch drags by hand on a touchscreen.
+// (desktop only); the user checks touch drags and taps by hand on a touchscreen.
 
 const board = (page: Page) => page.locator('#host .plinko-config');
 const canvas = (page: Page) => page.locator('#host canvas');
@@ -46,14 +46,27 @@ async function lastDropX(page: Page): Promise<number> {
   return JSON.parse((text ?? '').replace(/^onDrop\s*/, '')).dropX;
 }
 
-test('a tap picks nothing up: the chip goes straight back', async ({ page, isMobile }) => {
+// Tapping plays without a drag (WCAG 2.2 SC 2.5.7): tap a tray chip, then tap where to drop it.
+test('a tap picks a chip up and a second tap drops it there', async ({ page, isMobile }) => {
   await mountBoard(page, { host: 'fixed' });
   const { trayChip, overBoard } = await spots(page);
   await tapOrClick(canvas(page), { position: trayChip(0), isMobile });
+  await expect(board(page)).toHaveAttribute('data-state', 'holding');
+  await tapOrClick(canvas(page), { position: overBoard(0.8), isMobile });
+  await expect(page.locator('#log')).toContainText('onDrop');
+  expect(await lastDropX(page)).toBeGreaterThan(0.6);
+  await expect(board(page)).toHaveAttribute('data-state', 'idle');
+  await expect.poll(() => countOf(page, 'on')).toBe(4);
+});
+
+test('a second tap on the tray puts the chip back', async ({ page, isMobile }) => {
+  await mountBoard(page, { host: 'fixed' });
+  const { trayChip } = await spots(page);
+  await tapOrClick(canvas(page), { position: trayChip(0), isMobile });
+  await expect(board(page)).toHaveAttribute('data-state', 'holding');
+  await tapOrClick(canvas(page), { position: trayChip(1), isMobile });
   await expect(board(page)).toHaveAttribute('data-state', 'idle');
   await expect.poll(() => countOf(page, 'on')).toBe(5);
-  await tapOrClick(canvas(page), { position: overBoard(0.5), isMobile });
-  await expect(page.locator('#log')).not.toContainText('onDrop');
 });
 
 test.describe('mouse drag', () => {
@@ -147,7 +160,7 @@ test.describe('touch', () => {
     }).toPass();
     const { trayChip } = await spots(page);
     await canvas(page).tap({ position: trayChip(0) });
-    await expect(board(page)).toHaveAttribute('data-state', 'idle'); // a tap puts it straight back
+    await expect(board(page)).toHaveAttribute('data-state', 'holding'); // a tap picks it up
     await expect(async () => {
       expect((await canvas(page).boundingBox())?.y).toBeGreaterThanOrEqual(-1);
     }).toPass();

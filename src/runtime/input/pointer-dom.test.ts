@@ -134,7 +134,10 @@ describe('drag', () => {
   it('released over the tray puts the chip back', () => {
     mount({ chips: [{ id: 'on', label: 'On', count: 3 }] });
     drag(trayChip(0), midBoard());
-    drag(trayChip(0), trayChip(0));
+    // Out over the board and back to the tray: a drag, not a tap.
+    pointer('pointerdown', trayChip(0));
+    pointer('pointermove', midBoard());
+    pointer('pointerup', trayChip(0));
     expect(counts()).toEqual({ on: 2 }); // only the first was lost
     expect(state()).toBe('idle');
   });
@@ -158,15 +161,65 @@ describe('drag', () => {
   });
 });
 
+// Tapping is the single-pointer way to play, no drag needed (WCAG 2.2 SC 2.5.7): tap a tray chip
+// to pick it up, then tap where to drop it. The same rules as a drag release decide what happens.
+// Documented in site/guide/accessibility.md#touch-and-mouse; change the page with these tests.
 describe('tap', () => {
-  it('on a tray chip does nothing: the chip goes straight back', () => {
+  it('on a tray chip picks it up and keeps holding it', () => {
+    const onPickUp = vi.fn();
+    mount({ chips: [{ id: 'on', label: 'On', count: 3 }], onPickUp });
+    click(trayChip(0));
+    expect(state()).toBe('holding');
+    expect(onPickUp).toHaveBeenCalledOnce();
+    expect(liveText()).toBe('Picked up an On chip. Use the arrow keys to move it.');
+  });
+
+  it('then in the drop zone drops the chip there, without reloading', () => {
     const onDrop = vi.fn();
     mount({ chips: [{ id: 'on', label: 'On', count: 3 }], onDrop });
     click(trayChip(0));
+    click(overBoard(0.8));
+    expect(onDrop).toHaveBeenCalledOnce();
+    expect(onDrop.mock.calls[0]?.[0].dropX).toBeGreaterThan(0.6);
+    expect(state()).toBe('idle');
+    expect(counts()).toEqual({ on: 2 });
+  });
+
+  it('then below the drop zone loses the chip, as a drag released there does', () => {
+    const onDrop = vi.fn();
+    mount({ chips: [{ id: 'on', label: 'On', count: 3 }], onDrop });
+    click(trayChip(0));
+    click(midBoard());
+    expect(onDrop).not.toHaveBeenCalled();
+    expect(state()).toBe('idle');
+    expect(counts()).toEqual({ on: 2 });
+    expect(liveText()).toBe('The On chip fell off the board.');
+  });
+
+  it('then on the tray puts the chip back', () => {
+    mount({ chips: [{ id: 'on', label: 'On', count: 3 }] });
+    click(trayChip(0));
+    click(trayChip(1));
     expect(state()).toBe('idle');
     expect(counts()).toEqual({ on: 3 });
-    click(overBoard(0.5));
-    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it('then a drag carries the held chip, and its release drops it', () => {
+    const onDrop = vi.fn();
+    mount({ onDrop });
+    click(trayChip(0));
+    drag(midBoard(), overBoard(0.3));
+    expect(onDrop).toHaveBeenCalledOnce();
+    expect(state()).toBe('idle');
+  });
+
+  it("isn't a drag that leaves the tray and comes back: that puts the chip back", () => {
+    mount({ chips: [{ id: 'on', label: 'On', count: 3 }] });
+    pointer('pointerdown', trayChip(0));
+    pointer('pointermove', midBoard());
+    pointer('pointerup', trayChip(0));
+    expect(state()).toBe('idle');
+    expect(counts()).toEqual({ on: 3 });
   });
 
   it('on an empty kind that can be requested asks for more', () => {
