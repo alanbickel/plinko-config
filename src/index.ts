@@ -30,6 +30,7 @@ export {
   DEFAULT_LABELS,
   type Labels,
   type LandingLabelInput,
+  type OverSlotLabelInput,
   type StockLabelInput,
 } from './runtime/labels';
 export type { ChipStyle, SlotStyle, Styles, TextStyle } from './runtime/styles';

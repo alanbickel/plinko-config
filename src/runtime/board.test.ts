@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlinkoConfigError } from '../core/validate';
 import { createPlinko } from './board';
 import type { PlinkoBoard, PlinkoOptions } from './types';
-import { BATCH_MS } from './view/a11y';
+import { BATCH_MS, OVER_MS } from './view/a11y';
 
 const base = (extra: Partial<PlinkoOptions> = {}): PlinkoOptions => ({
   slots: [
@@ -233,6 +233,104 @@ describe('keyboard carrying', () => {
     press(b, 'Enter');
     press(b, 'Enter');
     expect(onDrop).toHaveBeenCalledTimes(2);
+  });
+
+  describe('the slot under the chip', () => {
+    /** Everything the live region says from now on, repeats included. */
+    const record = (b: PlinkoBoard): string[] => {
+      const said: string[] = [];
+      const live = b.element.querySelector('[aria-live]') as HTMLElement;
+      new MutationObserver(() => said.push(liveText(b))).observe(live, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+      return said;
+    };
+    /** Runs timers, then lets the MutationObserver report. */
+    const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
+    const holdInDropZone = (extra: Partial<PlinkoOptions> = {}) => {
+      const b = mount(extra);
+      press(b, 'Enter');
+      carryUp(b);
+      return b;
+    };
+
+    it('is announced once the keys go quiet', async () => {
+      const b = holdInDropZone();
+      const said = record(b);
+      press(b, 'Home');
+      await wait(OVER_MS - 50);
+      expect(said).toEqual([]);
+      await wait(50);
+      expect(said).toEqual(['Over Email Marketing.']);
+      press(b, 'End');
+      await wait(OVER_MS);
+      expect(said).toEqual(['Over Email Marketing.', 'Over Cookies.']);
+    });
+
+    it('is announced only where the chip stops, not for every slot it passes', async () => {
+      const b = holdInDropZone();
+      press(b, 'Home');
+      await wait(OVER_MS);
+      const said = record(b);
+      for (let i = 0; i < 12; i++) {
+        press(b, 'ArrowRight');
+        await wait(OVER_MS - 50);
+      }
+      await wait(OVER_MS);
+      expect(said).toEqual(['Over Cookies.']);
+    });
+
+    it('is not repeated while the chip stays over the same slot', async () => {
+      const b = holdInDropZone();
+      press(b, 'Home');
+      await wait(OVER_MS);
+      const said = record(b);
+      press(b, 'ArrowRight');
+      await wait(OVER_MS);
+      expect(said).toEqual([]);
+    });
+
+    it('is announced again after the next pickup, even over the same slot', async () => {
+      const b = holdInDropZone({ autoReload: false });
+      press(b, 'Home');
+      await wait(OVER_MS);
+      press(b, 'Escape');
+      press(b, 'Enter');
+      carryUp(b);
+      const said = record(b);
+      press(b, 'ArrowRight'); // a move that stays over the first slot
+      await wait(OVER_MS);
+      expect(said).toEqual(['Over Email Marketing.']);
+    });
+
+    it('is dropped when the chip is dropped, lost or put back first', async () => {
+      // Dropped from the drop zone, put back, and lost (Enter below the drop zone).
+      for (const [key, carry] of [
+        ['Enter', true],
+        ['Escape', true],
+        ['Enter', false],
+      ] as const) {
+        const b = mount({ autoReload: false });
+        press(b, 'Enter');
+        if (carry) carryUp(b);
+        press(b, 'Home');
+        const said = record(b);
+        press(b, key);
+        await wait(OVER_MS);
+        expect(said.join(' ')).not.toContain('Over Email');
+      }
+    });
+
+    it('uses labels.overSlot', async () => {
+      const b = holdInDropZone({
+        labels: { overSlot: ({ chip, slot }) => `${chip.label} above ${slot.label}` },
+      });
+      press(b, 'End');
+      await wait(OVER_MS);
+      expect(liveText(b)).toBe('On above Cookies');
+    });
   });
 
   it('drop() from the handle carries the chip up itself, quietly', async () => {

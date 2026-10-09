@@ -1,8 +1,8 @@
 // What the board does when the held-chip state machine reports a change.
 
-import { dropXToBoard } from '../core/layout';
+import { dropXToBoard, slotIndexAt } from '../core/layout';
 import type { DroppedNotice, LostNotice, NoticeHandlers, PickedUpNotice } from './commands';
-import { type BoardContext, callHost, kindOf, stockOf } from './context';
+import { type BoardContext, callHost, heldChip, kindOf, stockOf } from './context';
 import { reportIfExhausted } from './supply';
 import { liftToY } from './view/geometry';
 
@@ -14,7 +14,7 @@ export function noticeHandlers(ctx: BoardContext): NoticeHandlers {
   const chip = (kindId: string) => ({ chip: kindOf(ctx, kindId) });
   const ignore = () => {};
   return {
-    aimed: ignore,
+    aimed: ({ x }) => onAimed(ctx, x),
     lifted: ignore,
     destroyed: ignore,
     pickedUp: (n) => onPickedUp(ctx, n),
@@ -27,8 +27,19 @@ export function noticeHandlers(ctx: BoardContext): NoticeHandlers {
       if (!ctx.ui.lockReason) say(labels().outOfChips(stockOf(ctx, kindId)));
     },
     busy: () => say(labels().busy),
-    cancelled: ({ kindId }) => say(labels().cancelled(chip(kindId))),
+    cancelled: ({ kindId }) => {
+      ctx.announcer.resetOver();
+      say(labels().cancelled(chip(kindId)));
+    },
   };
+}
+
+/** The slot under the held chip, announced once it stays put (see Announcer.overSlot). */
+function onAimed(ctx: BoardContext, x: number): void {
+  const held = heldChip(ctx);
+  const { layout } = ctx.world;
+  const slot = ctx.slots[slotIndexAt(layout, dropXToBoard(layout, x))];
+  if (held && slot) ctx.announcer.overSlot({ chip: kindOf(ctx, held.kindId), slot });
 }
 
 function onPickedUp(ctx: BoardContext, { kindId }: PickedUpNotice): void {
@@ -40,6 +51,7 @@ function onPickedUp(ctx: BoardContext, { kindId }: PickedUpNotice): void {
 
 function onDropped(ctx: BoardContext, { kindId, dropId, x, reloaded }: DroppedNotice): void {
   const chip = kindOf(ctx, kindId);
+  ctx.announcer.resetOver();
   callHost(ctx.options.onDrop, { chip, dropId, dropX: x });
   // With auto-reload the pickup that follows is the more useful thing to hear.
   if (reloaded) return;
@@ -49,6 +61,7 @@ function onDropped(ctx: BoardContext, { kindId, dropId, x, reloaded }: DroppedNo
 
 /** No callbacks, on purpose: the chip just falls off the board. Screen readers still hear it. */
 function onLost(ctx: BoardContext, { kindId, x, lift }: LostNotice): void {
+  ctx.announcer.resetOver();
   const from = ctx.ui.dragPoint ?? {
     x: dropXToBoard(ctx.world.layout, x),
     y: liftToY(ctx.carry, lift),

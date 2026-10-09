@@ -12,6 +12,12 @@ export interface LandingLabelInput extends ChipLabelInput {
   slot: SlotConfig<unknown>;
 }
 
+/** What the `overSlot` template receives. */
+export interface OverSlotLabelInput extends ChipLabelInput {
+  /** The slot under the held chip. */
+  slot: SlotConfig<unknown>;
+}
+
 /** What the `selected` and `outOfChips` templates receive: a chip kind and how many are left. */
 export interface StockLabelInput extends ChipLabelInput {
   /** Chips left; `Infinity` when unlimited. */
@@ -55,6 +61,11 @@ export interface Labels {
   enteredDropZone: string;
   /** Announced when the held chip moves out of the drop zone. */
   leftDropZone: string;
+  /**
+   * Announced when the held chip stops over a different slot (after a short pause, so moving
+   * across several slots says only where it stopped). Also the first move after each pickup.
+   */
+  overSlot: (input: OverSlotLabelInput) => string;
   /** Announced when a chip is dropped outside the drop zone and is lost. */
   fellOff: ChipLabel;
   /** Announced when a chip lands in a slot. */
@@ -107,6 +118,7 @@ export const DEFAULT_LABELS: Labels = {
   dropped: () => 'Dropped.',
   enteredDropZone: 'Over the drop zone. Release or press Enter to drop.',
   leftDropZone: 'Left the drop zone.',
+  overSlot: ({ slot }) => `Over ${slot.label}.`,
   fellOff: ({ chip }) => `The ${chip.label} chip fell off the board.`,
   landed: ({ chip, slot }) => `${chip.label} chip landed in ${slot.label}.`,
   missed: ({ chip }) => `The ${chip.label} chip didn't make it into a slot.`,

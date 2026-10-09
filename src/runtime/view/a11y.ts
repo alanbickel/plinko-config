@@ -1,10 +1,12 @@
 // Screen-reader announcements through the board's own aria-live region.
 
 import type { ChipKindConfig } from '../../core/types';
-import type { Labels, LandingLabelInput } from '../labels';
+import type { Labels, LandingLabelInput, OverSlotLabelInput } from '../labels';
 
 /** Settlements this close together are announced as one batch (rapid fire). */
 export const BATCH_MS = 400;
+/** The held chip must stay put this long before the slot under it is announced. */
+export const OVER_MS = 250;
 
 export interface AnnouncerInput {
   live: HTMLElement;
@@ -16,6 +18,9 @@ export class Announcer {
   private missed: ChipKindConfig<unknown>[] = [];
   private timer: ReturnType<typeof setTimeout> | undefined;
   private flip = false;
+  private overTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Id of the slot last announced under the held chip. */
+  private overSaid: string | undefined;
 
   constructor(private input: AnnouncerInput) {}
 
@@ -29,6 +34,27 @@ export class Announcer {
     // so screen readers announce it again.
     this.flip = !this.flip;
     this.input.live.textContent = this.flip ? text : `${text}​`;
+  }
+
+  /**
+   * The held chip moved. Once it stays put for OVER_MS, announces the slot under it, unless that
+   * slot was the last one announced.
+   */
+  overSlot(over: OverSlotLabelInput): void {
+    clearTimeout(this.overTimer);
+    this.overTimer = setTimeout(() => {
+      this.overTimer = undefined;
+      if (over.slot.id === this.overSaid) return;
+      this.overSaid = over.slot.id;
+      this.say(this.input.labels.overSlot(over));
+    }, OVER_MS);
+  }
+
+  /** A new pickup, or the chip is gone: cancels a pending slot and forgets the last one. */
+  resetOver(): void {
+    clearTimeout(this.overTimer);
+    this.overTimer = undefined;
+    this.overSaid = undefined;
   }
 
   /** Queues a landing; flushed after a short quiet period. */
@@ -54,6 +80,7 @@ export class Announcer {
   }
 
   destroy(): void {
+    this.resetOver();
     clearTimeout(this.timer);
     this.landed = [];
     this.missed = [];
