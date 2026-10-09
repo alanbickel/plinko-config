@@ -70,7 +70,9 @@ const mount = (extra: Partial<PlinkoOptions> = {}) => {
 };
 
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'performance'] });
+  vi.useFakeTimers({
+    toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'performance'],
+  });
   host = document.createElement('div');
   document.body.append(host);
 });
@@ -209,7 +211,7 @@ describe('locked board', () => {
     expect(state()).toBe('locked');
     click(trayChip(0));
     vi.advanceTimersByTime(1000);
-    expect(liveText()).toContain('no longer make any changes');
+    expect(liveText()).toContain('You can no longer play.');
     expect(state()).toBe('locked');
   });
 });

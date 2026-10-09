@@ -94,12 +94,12 @@ export interface Labels {
  * from here.
  */
 export const DEFAULT_LABELS: Labels = {
-  board: 'Plinko preferences board',
+  board: 'Plinko board',
   roleDescription: 'game',
   instructions:
     'Left and right arrows choose a chip; Enter picks it up. Up and down arrows carry it, left ' +
     'and right move it across, Shift with arrows moves faster, Home and End jump to the edges. ' +
-    'Enter drops, Escape puts the chip back.',
+    'Carry it up into the drop zone, then press Enter to drop it. Escape puts the chip back.',
   selected: (input) => `${input.chip.label} chip${stock(input)}.`,
   pickedUp: ({ chip }) =>
     `Picked up ${article(chip.label)} ${chip.label} chip. Use the arrow keys to move it.`,
@@ -122,7 +122,7 @@ export const DEFAULT_LABELS: Labels = {
   requestMore: 'Enter: request more',
   requestPending: 'Requesting…',
   busy: 'Too many chips in the air. Wait a moment.',
-  locked: 'Sorry, you can no longer make any changes.',
+  locked: 'You can no longer play.',
   attribution: 'Powered by LittleJS',
 };
 

@@ -97,10 +97,18 @@ describe('mounting', () => {
     expect(canvas.tabIndex).toBe(0);
     expect(canvas.getAttribute('role')).toBe('application');
     expect(canvas.getAttribute('aria-roledescription')).toBe('game');
-    expect(canvas.getAttribute('aria-label')).toBe('Plinko preferences board');
+    expect(canvas.getAttribute('aria-label')).toBe('Plinko board');
     const describedBy = canvas.getAttribute('aria-describedby') ?? '';
     expect(document.getElementById(describedBy)?.textContent).toMatch(/arrows/i);
     expect(b.element.querySelector('[aria-live="polite"]')).not.toBeNull();
+  });
+
+  // Keyboard players can't see the drop zone, so the instructions say what sighted players see:
+  // where to drop from. Like pointer players, they find out what happens elsewhere by doing it.
+  it('tells keyboard players to drop from the drop zone', () => {
+    const describedBy = canvasOf(mount()).getAttribute('aria-describedby') ?? '';
+    const instructions = document.getElementById(describedBy)?.textContent ?? '';
+    expect(instructions).toMatch(/up into the drop zone/i);
   });
 
   it('shows the attribution link unless turned off', () => {
@@ -330,12 +338,12 @@ describe('full board', () => {
     expect(onFull).toHaveBeenCalledWith({ reason: expect.stringMatching(/slots|overflow/) });
     expect(b.element.dataset.state).toBe('locked');
     expect(b.element.dataset.zone).toBe('tray');
-    expect(liveText(b)).toBe('Sorry, you can no longer make any changes.');
+    expect(liveText(b)).toBe('You can no longer play.');
 
     expect(b.pickUp('on')).toBe(false);
     await expect(b.drop({ chip: 'on' })).rejects.toThrow(/can't pick up/);
     press(b, 'Enter');
-    expect(liveText(b)).toBe('Sorry, you can no longer make any changes.');
+    expect(liveText(b)).toBe('You can no longer play.');
   });
 });
 
@@ -397,7 +405,7 @@ describe('supply', () => {
     press(b, 'Enter');
     expect(onFull).toHaveBeenCalledWith({ reason: 'exhausted' });
     expect(b.element.dataset.state).toBe('locked');
-    expect(liveText(b)).toBe('Sorry, you can no longer make any changes.');
+    expect(liveText(b)).toBe('You can no longer play.');
   });
 
   it('locks straight away when there are no chips at all', () => {
@@ -558,7 +566,7 @@ describe('update', () => {
   it('refuses invalid values and changes nothing', () => {
     const b = mount();
     expect(() => b.update({ aimStep: 2, labels: { board: 'changed' } })).toThrow(/aimStep/);
-    expect(canvasOf(b).getAttribute('aria-label')).toBe('Plinko preferences board');
+    expect(canvasOf(b).getAttribute('aria-label')).toBe('Plinko board');
   });
 
   it('does nothing after destroy', () => {
@@ -578,7 +586,7 @@ describe('styles', () => {
       b.update({ styles: { chips: { maybe: {} } }, labels: { board: 'changed' } }),
     ).toThrow(/styles.chips has no chip with id maybe/);
     // Nothing changed: a bad update is all or nothing.
-    expect(canvasOf(b).getAttribute('aria-label')).toBe('Plinko preferences board');
+    expect(canvasOf(b).getAttribute('aria-label')).toBe('Plinko board');
   });
 
   it('accepts styles for real slots and chips, at mount and live', () => {
@@ -684,7 +692,7 @@ describe('slot labels', () => {
     expect(() =>
       b.update({ slotLabels: { layout: 'diagonal' as 'angled' }, labels: { board: 'changed' } }),
     ).toThrow(/slotLabels.layout must be/);
-    expect(canvasOf(b).getAttribute('aria-label')).toBe('Plinko preferences board');
+    expect(canvasOf(b).getAttribute('aria-label')).toBe('Plinko board');
   });
 });
 
