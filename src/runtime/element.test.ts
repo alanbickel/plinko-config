@@ -19,7 +19,9 @@ const wrapperIn = (element: PlinkoBoardElement) =>
   element.shadowRoot?.querySelector('.plinko-config') ?? null;
 
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'requestAnimationFrame', 'performance'] });
+  vi.useFakeTimers({
+    toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'performance'],
+  });
   definePlinkoBoard();
   el = document.createElement('plinko-board');
 });

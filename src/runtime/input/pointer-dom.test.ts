@@ -70,7 +70,7 @@ const mount = (extra: Partial<PlinkoOptions> = {}) => {
 };
 
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'requestAnimationFrame', 'performance'] });
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'performance'] });
   host = document.createElement('div');
   document.body.append(host);
 });
