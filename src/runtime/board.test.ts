@@ -235,6 +235,7 @@ describe('keyboard carrying', () => {
     expect(onDrop).toHaveBeenCalledTimes(2);
   });
 
+  // Listed in site/guide/accessibility.md#announcements; change the page with these tests.
   describe('the slot under the chip', () => {
     /** Everything the live region says from now on, repeats included. */
     const record = (b: PlinkoBoard): string[] => {
