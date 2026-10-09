@@ -49,7 +49,7 @@
     "mutate": "stryker run",
     "docs:dev": "npm --prefix site run dev",
     "docs:build": "npm --prefix site run build",
-    "docs:examples": "tsc -p site/examples && tsc -p site/examples/recipes/html && tsc -p site/examples/recipes/react && tsc -p site/examples/recipes/solid && tsc -p site/examples/recipes/angular && tsc -p site/.vitepress/theme/playground"
+    "docs:examples": "tsc -p site/examples && tsc -p site/examples/recipes/html && tsc -p site/examples/recipes/react && tsc -p site/examples/recipes/solid && tsc -p site/examples/recipes/angular && tsc -p site/.vitepress/theme/playground && tsx scripts/readme-examples.ts"
   },
   "size-limit": [
     {

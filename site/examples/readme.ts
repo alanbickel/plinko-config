@@ -1,4 +1,5 @@
-// The README's examples. README.md carries copies of these regions; keep them in step.
+// The README's examples. README.md carries copies of these regions;
+// scripts/readme-examples.ts checks that they match.
 
 // #region quick-start
 import { createPlinko, PlinkoConfigError } from 'plinko-config';
@@ -26,6 +27,8 @@ const board = createPlinko<boolean, Setting>('#board', {
     console.log(`${chip.label} missed`);
   },
 });
+
+// Later: board.destroy();
 // #endregion quick-start
 
 // #region update
@@ -46,6 +49,4 @@ try {
 }
 // #endregion errors
 
-// #region destroy
 board.destroy();
-// #endregion destroy

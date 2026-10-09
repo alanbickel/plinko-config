@@ -21,7 +21,7 @@ npx playwright install chromium webkit   # once, for e2e tests
 | `npm run sim -- --drops 5000 --x 0.5` | Headless physics simulation (options in `scripts/simulate.ts`) |
 | `npm run docs:dev` | Docs site with live reload (run `npm install` in `site/` once first) |
 | `npm run docs:build` | Build the docs site; fails on undocumented exports or dead links |
-| `npm run docs:examples` | Type-check the docs examples and framework recipes |
+| `npm run docs:examples` | Type-check the docs examples and framework recipes, and check that the README's examples are copies of `site/examples/readme*.ts` regions |
 
 Architecture is documented on the docs site, under Internals ([site/internals/](site/internals/)).
 
