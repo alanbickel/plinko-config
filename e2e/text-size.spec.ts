@@ -1,7 +1,7 @@
 import type { Browser, Page } from '@playwright/test';
 import { SIDE } from '../src/runtime/view/geometry';
 import { expect, test } from './fixtures';
-import type { MountSpec } from './harness/harness';
+import type { HarnessOptions, MountSpec } from './harness/harness';
 import { type Cell, cellName, labelsFor, pairwise, VIEWPORTS } from './text-matrix';
 import { type DrawnText, lastFrameText, overlaps, type Point, recordText } from './text-record';
 
@@ -28,13 +28,22 @@ interface CanvasBox {
 interface Opened {
   page: Page;
   labels: DrawnText[];
+  /** Everything drawn in the last frame: labels, tray captions and notes, the banner. */
+  drawn: DrawnText[];
   canvas: CanvasBox;
   close(): Promise<void>;
+}
+
+/** More than a cell says: options merged over the cell's, and page CSS after its own. */
+interface Extra {
+  options?: Partial<HarnessOptions>;
+  css?: string;
 }
 
 interface OpenInput {
   browser: Browser;
   cell: Cell;
+  extra?: Extra;
 }
 
 const viewportOf = ({ viewport, zoom }: Cell) => ({
@@ -42,17 +51,18 @@ const viewportOf = ({ viewport, zoom }: Cell) => ({
   height: Math.round(VIEWPORTS[viewport].height / zoom),
 });
 
-const mountSpecOf = (cell: Cell): MountSpec => ({
-  css: `html { font-size: ${cell.rem}px; }`,
+const mountSpecOf = (cell: Cell, extra: Extra = {}): MountSpec => ({
+  css: `html { font-size: ${cell.rem}px; } ${extra.css ?? ''}`,
   options: {
     slots: labelsFor(cell).map((label, i) => ({ id: `s${i}`, label })),
     board: { rows: cell.rows },
     slotLabels: { layout: cell.layout, horizontalWhenFit: cell.horizontalWhenFit },
+    ...extra.options,
   },
 });
 
 /** Mounts the cell's board in a context of its own (viewport, zoom, root font size). */
-async function open({ browser, cell }: OpenInput): Promise<Opened> {
+async function open({ browser, cell, extra }: OpenInput): Promise<Opened> {
   const context = await browser.newContext({
     viewport: viewportOf(cell),
     deviceScaleFactor: cell.zoom,
@@ -63,7 +73,7 @@ async function open({ browser, cell }: OpenInput): Promise<Opened> {
   await recordText(page);
   await page.goto('/');
   await page.waitForFunction(() => window.harness !== undefined);
-  await page.evaluate((s) => window.harness.mount(s), mountSpecOf(cell));
+  await page.evaluate((s) => window.harness.mount(s), mountSpecOf(cell, extra));
   const canvasEl = page.locator('#host canvas');
   await expect(canvasEl).toBeVisible();
   const drawn = await lastFrameText(page);
@@ -75,7 +85,8 @@ async function open({ browser, cell }: OpenInput): Promise<Opened> {
     expect(errors).toEqual([]);
     await context.close();
   };
-  return { page, labels: slotLabelsIn({ drawn, names: labelsFor(cell) }), canvas, close };
+  const labels = slotLabelsIn({ drawn, names: labelsFor(cell) });
+  return { page, labels, drawn, canvas, close };
 }
 
 interface LabelSearch {
@@ -255,4 +266,100 @@ test.describe('slot labels follow the font size and zoom', () => {
       expect(cutLabels(board.labels)).toEqual([]);
     });
   }
+});
+
+test.describe('tray and banner text follow the font size', () => {
+  /** Short labels on a wide, low board, with room for its text at twice the size. */
+  const WIDE: Cell = {
+    slots: 3,
+    rows: 3,
+    labels: 'tiny',
+    layout: 'vertical',
+    horizontalWhenFit: false,
+    viewport: '1920x1080',
+    rem: 16,
+    zoom: 1,
+  };
+  const REQUEST_MORE = 'Enter: request more';
+  /** One chip kind with none left: its caption and its "request more" note both show. */
+  const EMPTY_TRAY: Extra = {
+    options: { chips: [{ id: 'on', label: 'On', count: 0 }], styles: {} },
+  };
+  const isTray = (t: DrawnText) => t.text.includes('×') || t.text === REQUEST_MORE;
+
+  /** Tray caption and note sizes, CSS pixels, at a root font size. */
+  async function traySizes(input: OpenInput): Promise<number[]> {
+    const board = await open(input);
+    await board.close();
+    const tray = board.drawn.filter(isTray);
+    expect(tray.map((t) => t.text)).toEqual(['On ×0', REQUEST_MORE]);
+    return tray.map((t) => t.size);
+  }
+
+  test('tray captions and notes double with a 32px root font size', async ({ browser }) => {
+    const before = await traySizes({ browser, cell: WIDE, extra: EMPTY_TRAY });
+    const after = await traySizes({ browser, cell: { ...WIDE, rem: 32 }, extra: EMPTY_TRAY });
+    expect(after.map((size, i) => size / (before[i] ?? Number.NaN))).toEqual([
+      expect.closeTo(2, 1),
+      expect.closeTo(2, 1),
+    ]);
+    expect(Math.min(...before)).toBeGreaterThanOrEqual(FLOOR_REM * 16 - EPS);
+  });
+
+  /** The banner's size, CSS pixels, once the board locks with its only chip dropped. */
+  async function bannerSize(input: OpenInput): Promise<number> {
+    const board = await open(input);
+    await board.page.evaluate(() => {
+      window.harness
+        .board()
+        ?.drop()
+        .catch(() => {});
+    });
+    const banner = (await lastFrameText(board.page)).find((t) => t.text === 'Board full');
+    await board.close();
+    return banner?.size ?? Number.NaN;
+  }
+
+  test('the full-board banner doubles with a 32px root font size', async ({ browser }) => {
+    const extra: Extra = {
+      options: {
+        chips: [{ id: 'on', label: 'On', count: 1 }],
+        styles: {},
+        supply: { refill: { mode: 'never' } },
+        labels: { locked: 'Board full' },
+      },
+    };
+    const before = await bannerSize({ browser, cell: WIDE, extra });
+    const after = await bannerSize({ browser, cell: { ...WIDE, rem: 32 }, extra });
+    expect(after / before).toBeCloseTo(2, 1);
+  });
+
+  for (const viewport of ['pixel7', '1280x800'] as const) {
+    test(`${viewport}, root font size 32px: tray text stays inside the canvas and apart`, async ({
+      browser,
+    }) => {
+      const cell: Cell = { ...WIDE, labels: 'short', slots: 5, rows: 8, viewport, rem: 32 };
+      const board = await open({ browser, cell, extra: EMPTY_TRAY });
+      await board.close();
+      const tray = board.drawn.filter(isTray);
+      expect(outside({ labels: tray, canvas: board.canvas })).toEqual([]);
+      expect(clashes([...board.labels, ...tray])).toEqual([]);
+    });
+  }
+
+  // Changing the browser's font size setting resizes nothing the board otherwise watches when the
+  // host's width doesn't depend on it, so the board has to notice the font size itself.
+  test('a root font size change alone refits the board', async ({ browser }) => {
+    const extra: Extra = { css: 'body { padding: 0; } #host { width: 600px; }' };
+    const board = await open({ browser, cell: WIDE, extra });
+    const before = board.labels.map((t) => t.size);
+    await board.page.evaluate(() => {
+      document.documentElement.style.fontSize = '32px';
+    });
+    const after = (await lastFrameText(board.page)).slice(0, before.length).map((t) => t.size);
+    await board.close();
+    expect(after.map((size, i) => size / (before[i] ?? Number.NaN))).toEqual(
+      before.map(() => expect.closeTo(2, 1)),
+    );
+  });
 });

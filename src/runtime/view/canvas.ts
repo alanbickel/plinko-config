@@ -8,7 +8,9 @@ import type { Zone } from '../input/actions';
 import type { ResolvedChipStyle, ResolvedStyles, ResolvedText } from '../styles';
 import type { Theme } from '../theme';
 import {
+  type BannerLayout,
   type BoardPoint,
+  bannerLayout,
   type CarryPath,
   carryPath,
   computeViewport,
@@ -17,7 +19,9 @@ import {
   FLOOR,
   liftToY,
   TRAY_CHIP_DY,
-  TRAY_H,
+  TRAY_CHIP_R,
+  type TrayLayout,
+  trayLayout,
   type Viewport,
   yToLift,
 } from './geometry';
@@ -31,15 +35,10 @@ import {
   planSlotLabels,
   type ResolvedSlotLabels,
   setFont,
-  TEXT_SIZE,
   textWidth,
 } from './slot-labels';
 
 const WALL = 0.12; // drawn wall thickness (the physics walls are thicker)
-const TRAY_CHIP_R = 0.32;
-/** Text sizes in board units: tray notes and the full-board banner (captions use TEXT_SIZE). */
-const NOTE_SIZE = 0.2;
-const BANNER_SIZE = 0.34;
 /** Opacity of an empty kind in the tray. */
 const EMPTY_ALPHA = 0.35;
 /** How long a peg stays lit after a hit. */
@@ -120,6 +119,8 @@ interface Geometry {
   viewport: Viewport;
   carry: CarryPath;
   plan: LabelPlan;
+  tray: TrayLayout;
+  banner: BannerLayout;
 }
 
 interface PainterInput extends CanvasViewInput, Geometry {
@@ -193,8 +194,11 @@ export class CanvasView {
     const { layout, slotLabels } = this.input;
     const options = slotLabels;
     const plan = planSlotLabels({ widths: this.widths, options, layout, remPx, cssWidth });
-    const geometry = { layout, strip: plan.strip };
-    return { viewport: computeViewport(geometry), carry: carryPath(geometry), plan };
+    const scale = { unit: plan.unit, remPx };
+    const tray = trayLayout(scale);
+    const geometry = { layout, strip: plan.strip, trayHeight: tray.height };
+    const banner = bannerLayout(scale);
+    return { viewport: computeViewport(geometry), carry: carryPath(geometry), plan, tray, banner };
   }
 
   /** Re-plans after the labels' fonts or layout change. True if the board's shape changed. */
@@ -424,7 +428,7 @@ class Painter {
   private drawTray(frame: FrameState): void {
     const { g, kinds, theme, viewport } = this.input;
     g.fillStyle = theme.tray;
-    g.fillRect(viewport.x0, viewport.trayY, viewport.w, TRAY_H);
+    g.fillRect(viewport.x0, viewport.trayY, viewport.w, this.input.tray.height);
     kinds.forEach((kind, i) => {
       this.drawTrayChip({ kind, index: i, frame });
     });
@@ -445,13 +449,24 @@ class Painter {
     g.globalAlpha = 1;
     if (selected) this.drawSelection({ at, frame });
     const caption = captionStyle({ label: styles.chips[index]?.label, selected, styles });
-    const maxWidth = cell * 0.95;
     const text = `${kind.label} ×${formatCount(count)}`;
-    this.line({ text, style: caption, size: TEXT_SIZE, maxWidth, at: { x: at.x, y: at.y + 0.6 } });
-    const note = frame.trayNotes[index];
+    this.drawTrayText({
+      x: at.x,
+      cell,
+      caption: { text, style: caption },
+      note: frame.trayNotes[index],
+    });
+  }
+
+  /** A tray kind's caption, and its note if it has one, on the tray's two text lines. */
+  private drawTrayText({ x, cell, caption, note }: TrayTextInput): void {
+    const { tray, viewport, styles } = this.input;
+    const maxWidth = cell * 0.95;
+    const captionAt = { x, y: viewport.trayY + tray.captionY };
+    this.line({ ...caption, size: tray.captionSize, maxWidth, at: captionAt });
     if (!note) return;
-    const noteAt = { x: at.x, y: at.y + 0.95 };
-    this.line({ text: note, style: styles.mutedText, size: NOTE_SIZE, maxWidth, at: noteAt });
+    const noteAt = { x, y: viewport.trayY + tray.noteY };
+    this.line({ text: note, style: styles.mutedText, size: tray.noteSize, maxWidth, at: noteAt });
   }
 
   /** The selected tray kind: a focus ring while the tray has focus, a quiet ring otherwise. */
@@ -462,13 +477,13 @@ class Painter {
   }
 
   private drawBanner(message: string): void {
-    const { g, layout, theme, viewport } = this.input;
+    const { g, layout, theme, viewport, banner } = this.input;
     const y = (layout.spawnY + layout.railTopY) / 2;
     g.fillStyle = theme.overlay;
-    g.fillRect(viewport.x0, y - 0.7, viewport.w, 1.4);
+    g.fillRect(viewport.x0, y - banner.band / 2, viewport.w, banner.band);
     const style = { ...this.input.styles.text, fontWeight: '600' };
     const at = { x: layout.width / 2, y };
-    this.line({ text: message, style, size: BANNER_SIZE, maxWidth: viewport.w - 0.4, at });
+    this.line({ text: message, style, size: banner.size, maxWidth: viewport.w - 0.4, at });
   }
 
   /** One centred line: shrunk to fit (never below the minimum size), then cut with "…". */
@@ -509,6 +524,21 @@ class Painter {
     g.lineWidth = stroke.width;
     g.stroke();
   }
+}
+
+/** Some text in a style: a tray caption. */
+interface StyledText {
+  text: string;
+  style: ResolvedText;
+}
+
+interface TrayTextInput {
+  /** Centre of the tray kind's column, board units. */
+  x: number;
+  /** Width of the column, board units. */
+  cell: number;
+  caption: StyledText;
+  note: string | undefined;
 }
 
 interface LineInput {

@@ -4,7 +4,7 @@
 import type { BoardContext } from './context';
 
 const FALLBACK_WIDTH = 300;
-/** The root font size when there's no window to read it from (the browser default). */
+/** The root font size when the ruler measures nothing (no layout, as in jsdom): the default. */
 const DEFAULT_REM_PX = 16;
 
 export interface FitInput {
@@ -34,9 +34,9 @@ export function fitToHost(ctx: BoardContext): void {
   ctx.loop.redraw();
 }
 
-/** The root font size, CSS pixels: what rem-sized canvas text is sized from. */
-function remOf({ win }: BoardContext): number {
-  const size = win ? parseFloat(win.getComputedStyle(win.document.documentElement).fontSize) : NaN;
+/** The root font size, CSS pixels, from the 1rem ruler: what rem-sized canvas text is sized from. */
+function remOf({ dom }: BoardContext): number {
+  const size = dom.remRuler.getBoundingClientRect().width;
   return size > 0 ? size : DEFAULT_REM_PX;
 }
 

@@ -189,9 +189,9 @@ type WorldEvent = LandedEvent | MissedEvent;
 
   | Page | Spec |
   |---|---|
-  | [Sizing: Text size](site/contracts/sizing.md#text-size) and [Labels and narrow slots](site/contracts/sizing.md#labels-and-narrow-slots) | `src/runtime/view/slot-labels.test.ts` (every rule, across the cross product) and `e2e/text-size.spec.ts` (real fonts) |
+  | [Sizing: Text size](site/contracts/sizing.md#text-size) and [Labels and narrow slots](site/contracts/sizing.md#labels-and-narrow-slots) | `src/runtime/view/slot-labels.test.ts` and `src/runtime/view/geometry.test.ts` (every rule, across the cross product) and `e2e/text-size.spec.ts` (real fonts) |
   | The table in [Labels and narrow slots](site/contracts/sizing.md#labels-and-narrow-slots) | Measured by `scripts/label-ceilings.ts`; re-run it and paste the table after changing how labels or the board are sized |
-  | [Sizing internals](site/internals/sizing.md) (fitting, planning slot labels) | `src/runtime/sizing.test.ts`, `src/runtime/view/slot-labels.test.ts` |
+  | [Sizing internals](site/internals/sizing.md) (fitting, planning slot labels, the tray and the banner) | `src/runtime/sizing.test.ts`, `src/runtime/view/slot-labels.test.ts`, `src/runtime/view/geometry.test.ts` |
 
 ### Mutation testing
 

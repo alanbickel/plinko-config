@@ -6,9 +6,11 @@ import { type Layout, ROW_SPACING } from '../../core/layout';
 export const SIDE = 0.25; // margin left and right of the walls
 const TOP = 0.9; // space above the drop line for the held chip
 export const FLOOR = 0.15;
-export const TRAY_H = 1.95;
+
 /** Tray chips' centre, below the top of the tray. */
 export const TRAY_CHIP_DY = 0.65;
+/** Tray chips' radius. */
+export const TRAY_CHIP_R = 0.32;
 /** Rows of pegs one Shift+arrow carries the chip. */
 const LARGE_LIFT_ROWS = 4;
 
@@ -31,14 +33,73 @@ export interface Viewport {
 export interface GeometryInput {
   layout: Layout;
   strip: LabelStrip;
+  /** From trayLayout. */
+  trayHeight: number;
 }
 
-export function computeViewport({ layout, strip }: GeometryInput): Viewport {
+export function computeViewport({ layout, strip, trayHeight }: GeometryInput): Viewport {
   const y0 = layout.spawnY - TOP;
   const trayY = layout.floorY + FLOOR + strip.height;
   // The label room is mirrored on the left so the board stays centred.
   const side = SIDE + strip.extraRight;
-  return { x0: -side, y0, w: layout.width + 2 * side, h: trayY + TRAY_H - y0, trayY };
+  return { x0: -side, y0, w: layout.width + 2 * side, h: trayY + trayHeight - y0, trayY };
+}
+
+/** Slot label and tray caption size, rem: it follows the root font size, so text settings and zoom. */
+export const LABEL_REM = 0.875;
+/** No canvas text is drawn smaller than this, rem. Tray notes are this size. */
+export const MIN_TEXT_REM = 0.75;
+/** The full-board banner's text size, rem. */
+const BANNER_REM = 1.125;
+/** A line of text, in text sizes. */
+const LINE = 1.1;
+/** Space between the tray chips and their caption, and under the tray's last line, board units. */
+const TRAY_GAP = 0.12;
+const TRAY_PAD = 0.3;
+/** The banner's band is never thinner than this, board units, nor than its text needs. */
+const BANNER_BAND = 1.4;
+const BANNER_LINES = 2.5;
+
+/** A canvas's scale and root font size: what rem-sized text is laid out from. */
+export interface TextScale {
+  /** CSS pixels per board unit. */
+  unit: number;
+  /** CSS pixels per rem. */
+  remPx: number;
+}
+
+/** The tray: its height, and where its caption and note lines sit (from its top), board units. */
+export interface TrayLayout {
+  height: number;
+  captionY: number;
+  captionSize: number;
+  noteY: number;
+  noteSize: number;
+}
+
+/**
+ * The tray's chips are part of the board (board units); its caption and note lines are rem-sized
+ * text, so the tray grows with the root font size. A note line is always kept, so a note showing
+ * or going doesn't change the board's shape.
+ */
+export function trayLayout({ unit, remPx }: TextScale): TrayLayout {
+  const captionSize = (LABEL_REM * remPx) / unit;
+  const noteSize = (MIN_TEXT_REM * remPx) / unit;
+  const captionY = TRAY_CHIP_DY + TRAY_CHIP_R + TRAY_GAP + (LINE * captionSize) / 2;
+  const noteY = captionY + (LINE * (captionSize + noteSize)) / 2;
+  const height = noteY + (LINE * noteSize) / 2 + TRAY_PAD;
+  return { height, captionY, captionSize, noteY, noteSize };
+}
+
+/** The full-board banner: its text size and the height of the band behind it, board units. */
+export interface BannerLayout {
+  size: number;
+  band: number;
+}
+
+export function bannerLayout({ unit, remPx }: TextScale): BannerLayout {
+  const size = (BANNER_REM * remPx) / unit;
+  return { size, band: Math.max(BANNER_BAND, BANNER_LINES * size) };
 }
 
 /**

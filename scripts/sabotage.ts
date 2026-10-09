@@ -13,6 +13,8 @@ const LABEL_TESTS = 'src/runtime/view/slot-labels.test.ts';
 const SIZING = 'src/runtime/sizing.ts';
 const SIZING_TESTS = 'src/runtime/sizing.test.ts';
 const GEOMETRY = 'src/runtime/view/geometry.ts';
+const GEOMETRY_TESTS = 'src/runtime/view/geometry.test.ts';
+const OBSERVE = 'src/runtime/observe.ts';
 const E2E = 'e2e/text-size.spec.ts';
 
 /** One find-and-replace; `find` must occur exactly once. */
@@ -135,6 +137,57 @@ const PATCHES: Patch[] = [
     bug: 'text sized to fit exactly is cut by a rounding error',
     edits: [{ file: LABELS, find: 'const ROUNDING = 1 + 1e-9;', replace: 'const ROUNDING = 1;' }],
     unit: { file: LABEL_TESTS, titles: ['shrinks text to fit, but never below the minimum'] },
+  },
+  {
+    name: 'tray-board-units',
+    bug: 'tray captions sized from the board, not rem (the old sizing)',
+    edits: [
+      {
+        file: GEOMETRY,
+        find: 'const captionSize = (LABEL_REM * remPx) / unit;',
+        replace: 'const captionSize = 0.26;',
+      },
+    ],
+    unit: { file: GEOMETRY_TESTS, titles: ['sizes captions at 0.875rem and notes at 0.75rem'] },
+    e2e: { file: E2E, titles: ['tray captions and notes double with a 32px root font size'] },
+  },
+  {
+    name: 'fixed-tray-height',
+    bug: "the tray keeps its height whatever its text's size",
+    edits: [
+      {
+        file: GEOMETRY,
+        find: 'const height = noteY + (LINE * noteSize) / 2 + TRAY_PAD;',
+        replace: 'const height = 1.95;',
+      },
+    ],
+    unit: {
+      file: GEOMETRY_TESTS,
+      titles: ['stacks chips, caption and note without overlap', 'grows with the root font size'],
+    },
+    e2e: {
+      file: E2E,
+      titles: ['1280x800, root font size 32px: tray text stays inside the canvas'],
+    },
+  },
+  {
+    name: 'banner-board-units',
+    bug: 'the banner sized from the board, not rem (the old sizing)',
+    edits: [
+      {
+        file: GEOMETRY,
+        find: 'const size = (BANNER_REM * remPx) / unit;',
+        replace: 'const size = 0.34;',
+      },
+    ],
+    unit: { file: GEOMETRY_TESTS, titles: ['sizes the banner at 1.125rem'] },
+    e2e: { file: E2E, titles: ['the full-board banner doubles with a 32px root font size'] },
+  },
+  {
+    name: 'no-rem-ruler',
+    bug: 'a root font size change alone goes unnoticed until something resizes',
+    edits: [{ file: OBSERVE, find: 'observer.observe(ctx.dom.remRuler);', replace: '' }],
+    e2e: { file: E2E, titles: ['a root font size change alone refits the board'] },
   },
 ];
 

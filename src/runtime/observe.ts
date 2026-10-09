@@ -59,6 +59,8 @@ function observeSize(ctx: BoardContext, refit: DeferredFit): ResizeObserver | un
   observer.observe(ctx.host);
   // The board never outgrows the screen, so a change in screen height can mean a refit.
   observer.observe(ctx.dom.screenRuler);
+  // The browser's text size setting changes the root font size, which canvas text is sized in.
+  observer.observe(ctx.dom.remRuler);
   return observer;
 }
 

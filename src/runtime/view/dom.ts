@@ -10,6 +10,8 @@ const VISUALLY_HIDDEN =
 const RULER_BOX = 'position:absolute;top:0;left:0;width:0;height:0;overflow:hidden';
 /** As tall as the screen with mobile browser bars shown (svh), so it doesn't change as they hide. */
 const RULER = 'width:0;height:100vh;height:100svh;visibility:hidden';
+/** One rem wide, so a change of root font size (the browser's text setting) resizes something. */
+const REM_RULER = 'width:1rem;height:0;visibility:hidden';
 const ATTRIBUTION_URL = 'https://github.com/KilledByAPixel/LittleJS';
 
 let instance = 0;
@@ -22,6 +24,8 @@ export interface BoardDom {
   live: HTMLDivElement;
   /** Measures the screen's height; observed instead of listening on window (no global listeners). */
   screenRuler: HTMLDivElement;
+  /** Measures 1rem, and is observed so a root font size change refits the board. */
+  remRuler: HTMLDivElement;
   attribution: HTMLAnchorElement | undefined;
 }
 
@@ -45,17 +49,17 @@ export function createDom({ host, labels, attribution }: CreateDomInput): BoardD
   const canvas = createCanvas(make);
   const instructions = createInstructions(make);
   const live = createLiveRegion(make);
-  const screenRuler = make.doc.createElement('div');
-  screenRuler.style.cssText = RULER;
+  const screenRuler = ruler(make, RULER);
+  const remRuler = ruler(make, REM_RULER);
   const rulerBox = make.doc.createElement('div');
   rulerBox.setAttribute('aria-hidden', 'true');
   rulerBox.style.cssText = RULER_BOX;
-  rulerBox.append(screenRuler);
+  rulerBox.append(screenRuler, remRuler);
   wrapper.append(canvas, instructions, live, rulerBox);
   const link = attribution ? createAttribution(make) : undefined;
   if (link) wrapper.append(link);
   host.append(wrapper);
-  return { wrapper, canvas, instructions, live, screenRuler, attribution: link };
+  return { wrapper, canvas, instructions, live, screenRuler, remRuler, attribution: link };
 }
 
 /** Puts new wording on the nodes that carry labels (board.update). */
@@ -64,6 +68,12 @@ export function applyLabels(dom: BoardDom, labels: Labels): void {
   dom.canvas.setAttribute('aria-roledescription', labels.roleDescription);
   dom.instructions.textContent = labels.instructions;
   if (dom.attribution) dom.attribution.textContent = labels.attribution;
+}
+
+function ruler({ doc }: Maker, css: string): HTMLDivElement {
+  const div = doc.createElement('div');
+  div.style.cssText = css;
+  return div;
 }
 
 function createWrapper({ doc }: Maker): HTMLDivElement {

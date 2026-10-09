@@ -4,7 +4,7 @@
 
 import type { Layout } from '../../core/layout';
 import { fontOf, type ResolvedText } from '../styles';
-import { type LabelStrip, SIDE } from './geometry';
+import { LABEL_REM, type LabelStrip, MIN_TEXT_REM, SIDE } from './geometry';
 
 /**
  * Where slot labels go. `'horizontal'`: one line under each slot. `'vertical'`: under each slot,
@@ -33,13 +33,6 @@ export const DEFAULT_SLOT_LABELS: Required<SlotLabelOptions> = {
   horizontalWhenFit: true,
 };
 
-/** Slot label text size, rem: it follows the root font size, so browser text settings and zoom. */
-export const LABEL_REM = 0.875;
-/** No canvas text is drawn smaller than this, rem. */
-export const MIN_TEXT_REM = 0.75;
-
-/** Tray caption size, board units. */
-export const TEXT_SIZE = 0.26;
 /** Share of a slot's width a horizontal label may use. */
 const CELL = 0.92;
 /** Horizontal strip height, in text sizes. */

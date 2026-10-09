@@ -18,7 +18,7 @@ A target whose height doesn't depend on its content, such as one with a fixed `h
 
 ## When it refits
 
-The board refits when the target, the wrapper, or the screen changes size. It also refits after `update()` changes the theme, the per-slot or per-chip styles, or the slot label layout, since those can change the board's shape.
+The board refits when the target, the wrapper, or the screen changes size, and when the root font size changes. It also refits after `update()` changes the theme, the per-slot or per-chip styles, or the slot label layout, since those can change the board's shape.
 
 ## Slot labels and shape
 
@@ -33,11 +33,11 @@ The slot labels sit in a strip under the slots, or on the slots' back walls. The
 
 With `horizontalWhenFit` (on by default), `'vertical'` and `'angled'` labels are shown horizontally instead whenever every label fits its slot at the normal size.
 
-The label strip is part of the board. A layout with a deeper strip makes the board taller for the same width, which on a short screen means narrower. Changing the layout, the label font, or the root font size changes the board's shape.
+The label strip and the tray are part of the board. A layout with a deeper strip makes the board taller for the same width, which on a short screen means narrower; so does larger text, since the strip and the tray's caption lines grow with it. Changing the layout, the label font, or the root font size changes the board's shape.
 
 ## Text size
 
-Slot labels are sized in rem, so they follow the visitor's font size setting and page zoom: 0.875rem normally, and never smaller than 0.75rem. Tray captions and the message shown when the board is full are sized with the board, and also never smaller than 0.75rem.
+Canvas text is sized in rem, so it follows the visitor's font size setting and page zoom. Slot labels and tray captions are 0.875rem, tray notes 0.75rem, and the message shown when the board is full 1.125rem. No canvas text is drawn smaller than 0.75rem.
 
 ## Labels and narrow slots
 
@@ -52,8 +52,8 @@ The most slots whose labels stay apart, measured with labels like "Email Marketi
 | Screen | Text | 3 rows | 8 rows | 16 rows |
 |---|---|---|---|---|
 | Phone 320×568 | 100% | 18 / 25 / 25 / 13 | 18 / 25 / 25 / 13 | 18 / 25 / 25 / 13 |
-| Phone 320×568 | 200% font size | 7 / 14 / 14 / 5 | 7 / 14 / 14 / – | – / 4 / 14 / – |
-| Phone 320×568 | 200% zoom | 7 / 15 / 15 / 5 | 7 / 15 / 15 / – | – / – / 15 / – |
+| Phone 320×568 | 200% font size | 7 / 14 / 14 / 5 | 7 / 14 / 14 / – | – / – / 14 / – |
+| Phone 320×568 | 200% zoom | 7 / 15 / 15 / 5 | – / 15 / 15 / – | – / – / 15 / – |
 | Pixel 7 (412×839) | 100% | 24 / 25 / 25 / 18 | 24 / 25 / 25 / 18 | 24 / 25 / 25 / 18 |
 | Pixel 7 (412×839) | 200% font size | 10 / 19 / 19 / 7 | 10 / 19 / 19 / 7 | 10 / 14 / 19 / – |
 | Pixel 7 (412×839) | 200% zoom | 11 / 20 / 20 / 7 | 11 / 20 / 20 / 7 | 11 / 14 / 20 / – |
@@ -61,7 +61,7 @@ The most slots whose labels stay apart, measured with labels like "Email Marketi
 | Desktop 1280×800 | 200% font size | 25 / 25 / 25 / 25 | 25 / 25 / 25 / 25 | 25 / 25 / 25 / – |
 | Desktop 1280×800 | 200% zoom | 25 / 25 / 25 / 25 | 25 / 25 / 25 / 25 | 25 / 25 / 25 / – |
 | Desktop 1280×520 | 100% | 25 / 25 / 25 / 25 | 25 / 25 / 25 / 25 | 25 / 25 / 25 / 25 |
-| Desktop 1280×520 | 200% font size | 25 / 25 / 25 / 25 | 25 / 25 / 25 / – | – / – / 25 / – |
+| Desktop 1280×520 | 200% font size | 25 / 25 / 25 / 25 | – / 25 / 25 / – | – / – / 25 / – |
 | Desktop 1280×520 | 200% zoom | 25 / 25 / 25 / 25 | – / 25 / 25 / – | – / – / 25 / – |
 
 25 is the most measured, not a limit.
