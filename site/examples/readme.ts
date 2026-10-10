@@ -32,7 +32,8 @@ const board = createPlinko<boolean, Setting>('#board', {
 // #endregion quick-start
 
 // #region update
-// Change options on the live board. Slots, chips, board, physics, and supply are fixed at mount.
+// Change options on the live board. Slots, chips, board, physics, supply, and attribution
+// are fixed at mount.
 board.update({
   motion: 'reduced',
   labels: { board: 'Settings board' },

@@ -1,9 +1,12 @@
 name: CI
 
+# Runs on every PR; on main, release.yml calls it before publishing.
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   check:

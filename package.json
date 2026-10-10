@@ -1,18 +1,27 @@
 {
   "name": "plinko-config",
   "version": "0.0.0",
-  "description": "Set user preferences by playing Plinko. A deliberately terrible UI component.",
+  "description": "Gamify your settings. Drive your app with plinko-config, a delightfully sinister UI component.",
   "keywords": [
     "plinko",
     "preferences",
     "settings",
     "ui",
-    "joke",
+    "sinister",
     "web-component",
-    "canvas"
+    "canvas",
+    "non-deterministic UX"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alanbickel/plinko-config.git"
+  },
+  "bugs": {
+    "url": "https://github.com/alanbickel/plinko-config/issues"
+  },
   "homepage": "https://alanbickel.github.io/plinko-config/",
   "license": "MIT-0",
+  "author": "Alan Bickel",
   "type": "module",
   "sideEffects": [
     "./dist/element.js"
@@ -50,7 +59,8 @@
     "docs:dev": "npm run build && npm --prefix site run dev",
     "docs:build": "npm run build && npm --prefix site run build",
     "docs:gif": "npm run docs:build && tsx scripts/readme-gif.ts",
-    "docs:examples": "npm run build && tsc -p site/examples && tsc -p site/examples/recipes/html && tsc -p site/examples/recipes/react && tsc -p site/examples/recipes/solid && tsc -p site/examples/recipes/angular && tsc -p site/.vitepress/theme/playground && tsx scripts/readme-examples.ts && tsx scripts/playground-export.ts"
+    "docs:examples": "npm run build && tsc -p site/examples && tsc -p site/examples/recipes/html && tsc -p site/examples/recipes/react && tsc -p site/examples/recipes/solid && tsc -p site/examples/recipes/angular && tsc -p site/.vitepress/theme/playground && tsx scripts/readme-examples.ts && tsx scripts/playground-export.ts",
+    "prepack": "npm run build"
   },
   "size-limit": [
     {

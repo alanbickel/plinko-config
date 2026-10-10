@@ -27,7 +27,7 @@ Architecture is documented on the docs site, under Internals ([site/internals/](
 
 ## Documentation
 
-The docs site lives in `site/` (VitePress) and deploys to GitHub Pages from `main`. Most of it is generated from the code, so keep the code and its comments accurate:
+The docs site lives in `site/` (VitePress) and deploys to GitHub Pages with each release (see Releasing). Most of it is generated from the code, so keep the code and its comments accurate:
 
 - **Every public export needs a doc comment**, and so does each of its fields. The API reference is generated from them by TypeDoc, and the docs build fails if one is missing. Write for a developer who has never seen the library: say what it does and when to use it, not how it's implemented. Use `@defaultValue` for defaults.
 - **Code examples are real files** in `site/examples/`, pulled into pages with `<<< ../examples/file.ts#region`. They're type-checked against `src/`, so an API change that breaks an example breaks the build. Don't paste untested code into a page.
@@ -200,3 +200,11 @@ type WorldEvent = LandedEvent | MissedEvent;
 We explored [Stryker](https://stryker-mutator.io/) for mutation testing: it plants small bugs (mutants) in the code and checks that some test fails for each one. With our versions (Stryker 10.0.0, Vitest 5.0.3) it doesn't look like it works well. Mutants in code that only runs inside a test (`it(...)`) never seem to be switched on, so they're reported as surviving even when the same bug, planted by hand, fails the tests. Code that runs at import time is mutated correctly, which makes the scores uneven and misleading.
 
 So we're parking it. The setup is still here (`npm run mutate`, `stryker.config.mjs`), but its scores aren't meaningful for now; `scripts/sabotage.ts` covers the same question for the sizing and label code. This is open for future investigation: a newer Stryker or Vitest may fix it, and `fitWidth` in `src/runtime/sizing.ts` makes a good first check, since its tests kill every planted mutant by hand.
+
+## Releasing
+
+Releases run from `.github/workflows/release.yml` on every push to `main`. CI and the docs build always run. If the `version` in `package.json` isn't on npm yet, the workflow publishes it with provenance (npm trusted publishing, no token), tags it `vX.Y.Z`, creates a GitHub Release with generated notes, and deploys the docs to GitHub Pages, so the docs match the published package.
+
+To release, bump the version in its own commit (`npm version <patch|minor|major> --no-git-tag-version`; the workflow creates the tag) and push to `main`. Versions stay below 1.0.0 until the API is stable.
+
+To deploy a docs fix without a release, run the Release workflow by hand (Actions → Release → Run workflow). It deploys `main` as it is, so only do this when `main` has no unreleased library changes.

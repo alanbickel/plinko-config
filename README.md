@@ -6,18 +6,17 @@ _A delightfully sinister UI component._
 
 ## Gamify your settings. Drive your app with Plinko.
 
-- A highly configurable, framework-agnostic UI component that's designed to gamify settings and configuration management (or any other event-driven workflow) in any application.
+- Each slot on the board is a setting or an outcome; each chip is a value. When a chip lands, your app gets both.
+- Framework-agnostic, and also available as a browser-native web component, `<plinko-board>`.
+- Keyboard control, screen-reader announcements, reduced motion, and tap-or-drag input
+  ([details](https://alanbickel.github.io/plinko-config/guide/accessibility)).
+- Colors come from CSS custom properties.
+- Zero runtime dependencies.
 
-- A11y-first design with full keyboard control and customizable screen-reader messaging
+## What you can change
 
-- Fully styleable, with colors from CSS custom properties
-
-- Zero runtime dependencies
-
-## Unique, immersive UX
-
-- Customize physics, board layout, labeling, styles, and more
-- Save and restore chip counts with `onSupplyChange`; carry chip counts across page loads and re-mounts.
+- Physics, board layout, labels, and styles.
+- Chip supply: save counts with `onSupplyChange` and restore them across page loads and re-mounts.
 
 **[Documentation](https://alanbickel.github.io/plinko-config/)** · [Getting started](https://alanbickel.github.io/plinko-config/guide/getting-started) · [API reference](https://alanbickel.github.io/plinko-config/api/)
 
@@ -111,7 +110,8 @@ Setting `options` again updates the live board. The docs have [framework recipes
 ## Changing a live board
 
 ```ts
-// Change options on the live board. Slots, chips, board, physics, and supply are fixed at mount.
+// Change options on the live board. Slots, chips, board, physics, supply, and attribution
+// are fixed at mount.
 board.update({
   motion: 'reduced',
   labels: { board: 'Settings board' },
