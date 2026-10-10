@@ -300,20 +300,21 @@ const tint = (hex: string) => `${hex}40`;
 
         <details>
           <summary>Physics <small>remount</small></summary>
-          <template v-for="s in PHYSICS_SLIDERS" :key="s.key">
-            <label class="slider">
+          <div v-for="s in PHYSICS_SLIDERS" :key="s.key" class="slider">
+            <label :for="`physics-${s.key}`">
               <span>{{ s.label }} <output>{{ config.physics[s.key] }}</output></span>
-              <input
-                v-model.number="config.physics[s.key]"
-                type="range"
-                :min="s.min"
-                :max="s.max"
-                :step="s.step"
-                :aria-describedby="`physics-${s.key}-hint`"
-              />
             </label>
             <p :id="`physics-${s.key}-hint`" class="slider-hint">{{ s.hint }}</p>
-          </template>
+            <input
+              :id="`physics-${s.key}`"
+              v-model.number="config.physics[s.key]"
+              type="range"
+              :min="s.min"
+              :max="s.max"
+              :step="s.step"
+              :aria-describedby="`physics-${s.key}-hint`"
+            />
+          </div>
           <label class="check"><input v-model="config.physics.chipCollisions" type="checkbox" /> Chips bounce off each other</label>
           <label class="field">
             Seed
