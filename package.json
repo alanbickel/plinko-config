@@ -91,5 +91,8 @@
   },
   "overrides": {
     "typed-rest-client": "2.3.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }
