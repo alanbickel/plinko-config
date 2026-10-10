@@ -20,6 +20,8 @@ export function mount(target: HTMLElement, output: HTMLElement) {
     ],
     chips: [{ id: 'lunch', label: 'Lunch' }],
     board: { rows: 6 },
+    // After a keyboard drop, pick up the next chip by hand.
+    autoReload: false,
     // Names on each slot's back wall, so eight fit without slanting.
     slotLabels: { layout: 'backboard' },
     // Rigged: pizza wins about a third of the time, not 1 in 8.

@@ -93,7 +93,8 @@ export interface PlaygroundConfig {
   labels: LabelDrafts;
 }
 
-export const DEFAULT_CONTROLS: ControlsDraft = {
+/** What the board does when these options are left out. The export leaves out matching values. */
+export const LIBRARY_CONTROLS: ControlsDraft = {
   autoReload: true,
   maxInFlight: null,
   motion: 'auto',
@@ -102,6 +103,9 @@ export const DEFAULT_CONTROLS: ControlsDraft = {
   liftStep: null,
   liftStepLarge: null,
 };
+
+/** Where the playground starts: like the library, but without auto-reload. */
+export const DEFAULT_CONTROLS: ControlsDraft = { ...LIBRARY_CONTROLS, autoReload: false };
 
 export function initialConfig(theme: ThemeChoice): PlaygroundConfig {
   return {

@@ -28,6 +28,8 @@ export function mount(target: HTMLElement, output: HTMLElement) {
     ],
     chips: [{ id: 'vote', label: 'Vote', count: 3 }],
     board: { rows: 4, slotHeight: 1.5 },
+    // After a keyboard drop, pick up the next chip by hand.
+    autoReload: false,
     supply: { refill: { mode: 'onRequest' } },
     onLand: ({ slot }) => {
       votes.tally[slot.label] = (votes.tally[slot.label] ?? 0) + 1;

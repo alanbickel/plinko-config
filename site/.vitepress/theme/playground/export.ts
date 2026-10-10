@@ -3,9 +3,9 @@
 
 import {
   DEFAULT_BOARD,
-  DEFAULT_CONTROLS,
   DEFAULT_PHYSICS,
   DEFAULT_SLOT_LABELS,
+  LIBRARY_CONTROLS,
   LIGHT_THEME,
   type PlaygroundConfig,
 } from './config';
@@ -69,7 +69,7 @@ function optionsLiteral(config: PlaygroundConfig): LiteralObject {
     slotLabels: changed(config.slotLabels, DEFAULT_SLOT_LABELS),
     physics: compact(physics),
     supply: supplyLiteral(config),
-    ...compact(changed(config.controls, DEFAULT_CONTROLS)),
+    ...compact(changed(config.controls, LIBRARY_CONTROLS)),
     theme: config.theme === 'light' ? { ...LIGHT_THEME } : undefined,
     styles: compact({ slots: styleEntries(config.slots), chips: styleEntries(config.chips) }),
     labels: labelsLiteral(config),

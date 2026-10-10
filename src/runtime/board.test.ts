@@ -235,6 +235,28 @@ describe('keyboard carrying', () => {
     expect(onDrop).toHaveBeenCalledTimes(2);
   });
 
+  it('announces a drop, and the reloaded chip in the same message', () => {
+    const b = mount({ autoReload: false });
+    press(b, 'Enter');
+    carryUp(b);
+    press(b, 'Enter');
+    expect(liveText(b)).toBe('Chip dropped.');
+
+    const reloading = mount();
+    press(reloading, 'Enter');
+    carryUp(reloading);
+    press(reloading, 'Enter');
+    expect(liveText(reloading)).toBe('Chip dropped. Another On chip has been picked up.');
+  });
+
+  it('uses labels.droppedAndReloaded', () => {
+    const b = mount({ labels: { droppedAndReloaded: ({ chip }) => `Again: ${chip.label}` } });
+    press(b, 'Enter');
+    carryUp(b);
+    press(b, 'Enter');
+    expect(liveText(b)).toBe('Again: On');
+  });
+
   // Listed in site/guide/accessibility.md#announcements; change the page with these tests.
   describe('the slot under the chip', () => {
     /** Everything the live region says from now on, repeats included. */

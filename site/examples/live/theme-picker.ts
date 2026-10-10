@@ -12,6 +12,8 @@ export function mount(target: HTMLElement, output: HTMLElement) {
     ],
     chips: [{ id: 'theme', label: 'Theme' }],
     board: { rows: 4, slotHeight: 1.5 },
+    // After a keyboard drop, pick up the next chip by hand.
+    autoReload: false,
     onLand: ({ slot }) => {
       output.dataset.theme = slot.id;
       output.textContent = `Theme: ${slot.label}`;

@@ -53,10 +53,10 @@ function onDropped(ctx: BoardContext, { kindId, dropId, x, reloaded }: DroppedNo
   const chip = kindOf(ctx, kindId);
   ctx.announcer.resetOver();
   callHost(ctx.options.onDrop, { chip, dropId, dropX: x });
-  // With auto-reload the pickup that follows is the more useful thing to hear.
-  if (reloaded) return;
-  ctx.announcer.say(ctx.config.labels.dropped({ chip }));
-  reportIfExhausted(ctx, kindId);
+  // One message, so the reload doesn't replace the drop in the live region.
+  const { labels } = ctx.config;
+  ctx.announcer.say((reloaded ? labels.droppedAndReloaded : labels.dropped)({ chip }));
+  if (!reloaded) reportIfExhausted(ctx, kindId);
 }
 
 /** No callbacks, on purpose: the chip just falls off the board. Screen readers still hear it. */

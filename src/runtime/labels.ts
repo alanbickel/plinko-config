@@ -57,6 +57,11 @@ export interface Labels {
   cancelled: ChipLabel;
   /** Announced when a chip is dropped and starts to fall. */
   dropped: ChipLabel;
+  /**
+   * Announced instead of `dropped` when `autoReload` picks up another chip of the same kind
+   * straight away.
+   */
+  droppedAndReloaded: ChipLabel;
   /** Announced when the held chip moves into the drop zone. */
   enteredDropZone: string;
   /** Announced when the held chip moves out of the drop zone. */
@@ -115,7 +120,8 @@ export const DEFAULT_LABELS: Labels = {
   pickedUp: ({ chip }) =>
     `Picked up ${article(chip.label)} ${chip.label} chip. Use the arrow keys to move it.`,
   cancelled: ({ chip }) => `Put the ${chip.label} chip back.`,
-  dropped: () => 'Dropped.',
+  dropped: () => 'Chip dropped.',
+  droppedAndReloaded: ({ chip }) => `Chip dropped. Another ${chip.label} chip has been picked up.`,
   enteredDropZone: 'Over the drop zone. Release or press Enter to drop.',
   leftDropZone: 'Left the drop zone.',
   overSlot: ({ slot }) => `Over ${slot.label}.`,

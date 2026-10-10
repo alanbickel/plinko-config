@@ -41,6 +41,11 @@ export const ANNOUNCED: LabelSpec[] = [
   { key: 'leftDropZone', hint: 'carried out of the drop zone', tokens: [] },
   { key: 'overSlot', hint: 'the held chip stopped over another slot', tokens: ['chip', 'slot'] },
   { key: 'dropped', hint: 'dropped and falling', tokens: chip },
+  {
+    key: 'droppedAndReloaded',
+    hint: 'dropped, and another chip picked up (auto-reload)',
+    tokens: chip,
+  },
   { key: 'fellOff', hint: 'dropped outside the drop zone', tokens: chip },
   { key: 'landed', hint: 'landed in a slot', tokens: ['chip', 'slot'] },
   { key: 'missed', hint: "didn't reach a slot", tokens: chip },

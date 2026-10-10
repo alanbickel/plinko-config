@@ -45,7 +45,8 @@ The actions are `left`, `right`, `up`, `down`, `home`, `end`, `pickUp`, `drop`, 
 Announcements go to a polite `aria-live` region. They cover:
 
 - choosing a kind, with how many are left ("On chip, 3 left.")
-- picking up, putting back, and dropping
+- picking up, putting back, and dropping ("Chip dropped."; with `autoReload`, the same message
+  says another chip was picked up)
 - carrying a chip into and out of the drop zone
 - the slot under the held chip, once it stops moving over a different slot
 - landing in a slot, missing, and falling off the board
