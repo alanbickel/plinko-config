@@ -2,6 +2,9 @@
 
 _A delightfully sinister UI component._
 
+[![npm](https://img.shields.io/npm/v/plinko-config)](https://www.npmjs.com/package/plinko-config)
+[![Release](https://github.com/alanbickel/plinko-config/actions/workflows/release.yml/badge.svg)](https://github.com/alanbickel/plinko-config/actions/workflows/release.yml)
+
 ![A Plinko board with Light, Dark, and System slots. Three chips are dragged onto it one at a time; as each lands, the card below switches to that theme.](https://raw.githubusercontent.com/alanbickel/plinko-config/main/.github/readme.gif)
 
 ## Gamify your settings. Drive your app with Plinko.
