@@ -20,8 +20,6 @@ _A delightfully sinister UI component._
 
 **[Documentation](https://alanbickel.github.io/plinko-config/)** · [Getting started](https://alanbickel.github.io/plinko-config/guide/getting-started) · [API reference](https://alanbickel.github.io/plinko-config/api/)
 
-> **Work in progress.** Not on npm yet.
-
 ## Install
 
 ```sh
