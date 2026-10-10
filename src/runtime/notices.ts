@@ -64,7 +64,7 @@ function onLost(ctx: BoardContext, { kindId, x, lift }: LostNotice): void {
   ctx.announcer.resetOver();
   const from = ctx.ui.dragPoint ?? {
     x: dropXToBoard(ctx.world.layout, x),
-    y: liftToY(ctx.carry, lift),
+    y: liftToY(ctx.view.carry, lift),
   };
   ctx.ui.falling.push({ kindId, from, startedAt: performance.now() });
   ctx.announcer.say(ctx.config.labels.fellOff({ chip: kindOf(ctx, kindId) }));

@@ -42,6 +42,7 @@ export type {
   DropOptions,
   FullDetails,
   FullReason,
+  KeySteps,
   LandDetails,
   MissDetails,
   MotionPreference,

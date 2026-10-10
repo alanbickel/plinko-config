@@ -70,7 +70,7 @@ function held(ctx: BoardContext): HeldChip | undefined {
 function dropZoneLook(ctx: BoardContext): DropZoneLook {
   const chip = heldChip(ctx);
   if (!chip) return 'hidden';
-  return chip.lift >= ctx.carry.zoneFrom ? 'lit' : 'shown';
+  return chip.lift >= ctx.view.carry.zoneFrom ? 'lit' : 'shown';
 }
 
 /** Under an empty kind: whether more can be requested, or a request is waiting. */

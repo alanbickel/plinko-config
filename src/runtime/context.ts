@@ -12,7 +12,7 @@ import type { FullReason, PlinkoOptions, RequestAnswer, Settled } from './types'
 import type { Announcer } from './view/a11y';
 import type { CanvasView } from './view/canvas';
 import type { BoardDom } from './view/dom';
-import type { BoardPoint, CarryPath, FallingChip } from './view/geometry';
+import type { BoardPoint, FallingChip } from './view/geometry';
 
 /** Mutable UI state that isn't the held-chip state machine. */
 export interface UiState {
@@ -50,8 +50,6 @@ export interface BoardContext {
   chips: readonly ChipKindConfig<unknown>[];
   kindIds: readonly string[];
   world: World;
-  /** The held chip's path from the tray to the drop line. */
-  carry: CarryPath;
   supply: Supply;
   /** Requests for more chips waiting on the host, by kind. */
   requests: Map<string, Promise<RequestAnswer>>;

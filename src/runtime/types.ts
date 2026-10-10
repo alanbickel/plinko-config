@@ -276,6 +276,18 @@ export interface SupplyController {
   request(request: SupplyRequest): Promise<RequestAnswer>;
 }
 
+/** What {@link PlinkoBoard.keySteps} reports: each option's value, or its default when unset. */
+export interface KeySteps {
+  /** The current `aimStep`. */
+  aimStep: number;
+  /** The current `aimStepLarge`. */
+  aimStepLarge: number;
+  /** The current `liftStep`. */
+  liftStep: number;
+  /** The current `liftStepLarge`. */
+  liftStepLarge: number;
+}
+
 /**
  * The handle `createPlinko()` returns. Use it to play the board from code, manage the chip
  * supply, change options, and clean up.
@@ -296,6 +308,11 @@ export interface PlinkoBoard<CV = unknown, SV = unknown> {
   drop(options?: DropOptions): Promise<Settled>;
   /** Puts the held chip back in the tray. */
   cancel(): void;
+  /**
+   * The step sizes the arrow keys use now: the `aimStep` and `liftStep` options, with defaults
+   * filled in. The default lift steps change with the slot label layout and the board's size.
+   */
+  keySteps(): KeySteps;
   /** Reads and changes chip counts. */
   readonly supply: SupplyController;
   /** Freezes the simulation and rendering until `resume()`. */

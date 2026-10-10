@@ -164,6 +164,26 @@ describe('drag', () => {
 // Tapping is the single-pointer way to play, no drag needed (WCAG 2.2 SC 2.5.7): tap a tray chip
 // to pick it up, then tap where to drop it. The same rules as a drag release decide what happens.
 // Documented in site/guide/accessibility.md#touch-and-mouse; change the page with these tests.
+describe('drop zone edge', () => {
+  /** The lowest canvas y a drag can be released at and still drop. */
+  const dropEdge = (onDrop: ReturnType<typeof vi.fn>): number => {
+    for (let y = Math.round(height() / 2); y >= 0; y--) {
+      const before = onDrop.mock.calls.length;
+      drag(trayChip(0), overBoard(0.5, y));
+      if (onDrop.mock.calls.length > before) return y;
+    }
+    throw new Error('no drop anywhere');
+  };
+
+  it('is where the board was last laid out, without needing an update()', () => {
+    const onDrop = vi.fn();
+    mount({ onDrop });
+    const edge = dropEdge(onDrop);
+    board.update({}); // re-reads the layout
+    expect(dropEdge(onDrop)).toBe(edge);
+  });
+});
+
 describe('tap', () => {
   it('on a tray chip picks it up and keeps holding it', () => {
     const onPickUp = vi.fn();

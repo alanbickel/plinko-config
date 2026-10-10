@@ -45,6 +45,7 @@ function setup(opts: SetupInput = {}): Harness {
       stock[kindId] = (stock[kindId] ?? 0) + 1;
     },
     inFlight: () => flying,
+    dropZoneFrom: () => opts.dropZoneFrom ?? 0,
     spawn(kindId: string, x: number) {
       spawned.push({ kindId, x });
       flying++;
@@ -56,7 +57,6 @@ function setup(opts: SetupInput = {}): Harness {
     kindIds: ['on', 'off'],
     maxInFlight: opts.maxInFlight ?? Infinity,
     autoReload: opts.autoReload ?? false,
-    dropZoneFrom: opts.dropZoneFrom ?? 0,
     notify: (n) => notices.push(n),
   });
   return {

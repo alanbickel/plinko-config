@@ -2,7 +2,8 @@
 // focus ring.
 
 import type { BoardContext } from '../context';
-import { defaultLiftSteps, type LiftSteps } from '../view/geometry';
+import type { KeySteps } from '../types';
+import { defaultLiftSteps } from '../view/geometry';
 import { interpretKey, type KeyContext } from './keyboard';
 import { createPerform, type Perform } from './perform';
 import { attachPointer } from './pointer-dom';
@@ -48,17 +49,17 @@ function keyContext(ctx: BoardContext): KeyContext {
     holding: machine.state.name === 'holding',
     selected: ui.selected,
     kindCount: kindIds.length,
-    aimStep: config.aimStep,
-    aimStepLarge: config.aimStepLarge,
-    ...liftSteps(ctx),
+    ...keySteps(ctx),
     keys: config.keys,
   };
 }
 
-/** The host's lift steps, or one and four peg rows of the board's current carry path. */
-function liftSteps({ config, carry }: BoardContext): LiftSteps {
-  const defaults = defaultLiftSteps(carry);
+/** The host's steps; unset lift steps are one and four peg rows of the board's current carry path. */
+export function keySteps({ config, view }: BoardContext): KeySteps {
+  const defaults = defaultLiftSteps(view.carry);
   return {
+    aimStep: config.aimStep,
+    aimStepLarge: config.aimStepLarge,
     liftStep: config.liftStep ?? defaults.liftStep,
     liftStepLarge: config.liftStepLarge ?? defaults.liftStepLarge,
   };

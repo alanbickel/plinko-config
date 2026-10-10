@@ -33,6 +33,8 @@ export interface CommandPorts {
   /** Return a reserved chip to the tray. */
   release(kindId: string): void;
   inFlight(): number;
+  /** Lift where the drop zone starts now; drops from below it lose the chip. */
+  dropZoneFrom(): number;
   /** Puts a chip in the world at x ∈ [0, 1]; returns its drop id. */
   spawn(kindId: string, x: number): number;
 }
@@ -42,8 +44,6 @@ export interface CommandMachineInput {
   kindIds: readonly string[];
   maxInFlight: number;
   autoReload: boolean;
-  /** Lift where the drop zone starts; drops from below it lose the chip. */
-  dropZoneFrom: number;
   notify: (notice: Notice) => void;
 }
 
@@ -51,7 +51,6 @@ export interface CommandMachineInput {
 export interface MachineSettings {
   maxInFlight: number;
   autoReload: boolean;
-  dropZoneFrom: number;
 }
 
 export interface DropCommand {
@@ -269,7 +268,7 @@ export class CommandMachine {
   }
 
   private inZone(held: HoldingState): boolean {
-    return held.lift >= this.input.dropZoneFrom;
+    return held.lift >= this.input.ports.dropZoneFrom();
   }
 
   private spawnHeld(held: HoldingState, reload: boolean): number {

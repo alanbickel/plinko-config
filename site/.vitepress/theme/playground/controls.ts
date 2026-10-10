@@ -18,14 +18,21 @@ type BoardKey = keyof PlaygroundConfig['board'];
 type StepKey = 'aimStep' | 'aimStepLarge' | 'liftStep' | 'liftStepLarge';
 
 export const PHYSICS_SLIDERS: SliderSpec<PhysicsKey>[] = [
-  { key: 'gravity', label: 'Gravity', min: 5, max: 120, step: 1, hint: 'How fast chips fall.' },
+  {
+    key: 'gravity',
+    label: 'Gravity',
+    min: 5,
+    max: 120,
+    step: 1,
+    hint: 'How quickly chips speed up as they fall.',
+  },
   {
     key: 'restitution',
     label: 'Bounce',
     min: 0,
     max: 1,
     step: 0.01,
-    hint: '0 = thud, 1 = superball.',
+    hint: 'Speed a chip keeps when it bounces: 0 = thud, 1 = superball.',
   },
   {
     key: 'friction',
@@ -33,17 +40,24 @@ export const PHYSICS_SLIDERS: SliderSpec<PhysicsKey>[] = [
     min: 0,
     max: 1,
     step: 0.01,
-    hint: 'Speed lost sliding past a peg.',
+    hint: 'Speed a chip loses sliding along a peg. High values let chips rest on pegs.',
   },
   {
     key: 'jitter',
-    label: 'Chaos',
+    label: 'Peg scatter',
     min: 0,
     max: 3,
     step: 0.05,
-    hint: 'Random sideways kick per peg.',
+    hint: 'Random sideways kick when a chip hits a peg.',
   },
-  { key: 'maxSpeed', label: 'Max speed', min: 2, max: 30, step: 0.5, hint: 'Speed cap.' },
+  {
+    key: 'maxSpeed',
+    label: 'Max speed',
+    min: 2,
+    max: 30,
+    step: 0.5,
+    hint: 'Top speed. Keeping it low stops fast chips passing through pegs.',
+  },
 ];
 
 export const BOARD_SLIDERS: SliderSpec<BoardKey>[] = [

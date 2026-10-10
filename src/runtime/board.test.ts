@@ -211,6 +211,23 @@ describe('keyboard carrying', () => {
     expect(liveText(b)).toContain('Left the drop zone');
   });
 
+  it('reaches the drop zone where the board was last laid out, without needing an update()', () => {
+    const b = mount();
+    const presses = () => {
+      press(b, 'Enter');
+      let n = 0;
+      while (!liveText(b).includes('Over the drop zone') && n < 200) {
+        press(b, 'ArrowUp');
+        n++;
+      }
+      press(b, 'Escape');
+      return n;
+    };
+    const before = presses();
+    b.update({}); // re-reads the layout
+    expect(presses()).toBe(before);
+  });
+
   it('Enter below the drop zone loses the chip, with no callbacks and no warning', () => {
     const onDrop = vi.fn();
     const onSupplyChange = vi.fn();
@@ -608,6 +625,65 @@ describe('supply', () => {
       await expect(b.supply.request({ chip: 'nope' })).resolves.toBe('deny');
       expect(ask).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('keySteps()', () => {
+  /** Picks up a chip and counts the presses of this key it takes to reach the drop zone. */
+  const pressesToZone = (b: PlinkoBoard, key: KeyboardEventInit): number => {
+    press(b, 'Enter');
+    for (let n = 1; n <= 200; n++) {
+      press(b, key);
+      if (liveText(b).includes('Over the drop zone')) {
+        press(b, 'Escape');
+        return n;
+      }
+    }
+    throw new Error('never reached the drop zone');
+  };
+  const up = { key: 'ArrowUp' };
+  const shiftUp = { key: 'ArrowUp', shiftKey: true };
+
+  it("reports the host's step sizes", () => {
+    const steps = { aimStep: 0.05, aimStepLarge: 0.3, liftStep: 0.1, liftStepLarge: 0.6 };
+    expect(mount(steps).keySteps()).toEqual(steps);
+  });
+
+  it('reports the default aim steps: a quarter slot and a slot', () => {
+    expect(mount().keySteps()).toMatchObject({ aimStep: 1 / 12, aimStepLarge: 1 / 3 });
+  });
+
+  it('reports the aim step the arrow keys use', () => {
+    const onDrop = vi.fn();
+    const b = mount({ onDrop });
+    press(b, 'Enter');
+    press(b, 'ArrowRight');
+    carryUp(b);
+    press(b, 'Enter');
+    expect(onDrop.mock.calls[0]?.[0].dropX).toBeCloseTo(0.5 + b.keySteps().aimStep, 6);
+  });
+
+  it('reports the default lift steps the arrow keys use', () => {
+    const b = mount();
+    const { liftStep, liftStepLarge } = b.keySteps();
+    const presses = pressesToZone(b, up);
+    const shiftPresses = pressesToZone(b, shiftUp);
+    // The same steps set explicitly reach the zone in as many presses; double steps don't.
+    b.update({ liftStep, liftStepLarge });
+    expect([pressesToZone(b, up), pressesToZone(b, shiftUp)]).toEqual([presses, shiftPresses]);
+    b.update({ liftStep: 2 * liftStep });
+    expect(pressesToZone(b, up)).toBeLessThan(presses);
+  });
+
+  it('follows update(): set steps, defaults again, and a new slot label layout', () => {
+    const b = mount();
+    const defaults = b.keySteps();
+    b.update({ aimStep: 0.2, liftStep: 0.5 });
+    expect(b.keySteps()).toMatchObject({ aimStep: 0.2, liftStep: 0.5 });
+    b.update({ aimStep: undefined, liftStep: undefined });
+    expect(b.keySteps()).toEqual(defaults);
+    b.update({ slotLabels: { layout: 'horizontal' } });
+    expect(b.keySteps().liftStep).not.toBe(defaults.liftStep);
   });
 });
 

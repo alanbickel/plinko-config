@@ -1,7 +1,7 @@
 // Drives the playground's board: mounts it, sends live changes through update(), and rebuilds it
 // (after a short pause) when a mount-only option changes.
 
-import { createPlinko, type PlinkoBoard, type PlinkoOptions } from 'plinko-config';
+import { createPlinko, type KeySteps, type PlinkoBoard, type PlinkoOptions } from 'plinko-config';
 import { answerRequest, liveOptions, mountOptions, type PlaygroundConfig } from './config';
 
 export interface LogEntry {
@@ -42,6 +42,8 @@ export interface PlaygroundBoard {
   reset(): void;
   setPaused(paused: boolean): void;
   setAutoDrop(on: boolean): void;
+  /** The step sizes the arrow keys use now, defaults included. */
+  keySteps(): KeySteps | undefined;
   destroy(): void;
 }
 
@@ -133,6 +135,10 @@ class Controller implements PlaygroundBoard {
     this.autoDropTimer = setInterval(() => {
       this.board?.drop({ x: Math.random() }).catch(() => {});
     }, AUTO_DROP_MS);
+  }
+
+  keySteps(): KeySteps | undefined {
+    return this.board?.keySteps();
   }
 
   destroy(): void {

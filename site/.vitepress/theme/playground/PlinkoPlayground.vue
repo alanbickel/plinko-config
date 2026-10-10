@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The playground view. Logic lives in config.ts, board.ts and export.ts (type-checked); this file
 // only binds controls to the config and shows the outputs.
+import type { KeySteps } from 'plinko-config';
 import { useData } from 'vitepress';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import {
@@ -35,6 +36,8 @@ const log = ref<LogEntry[]>([]);
 const transcript = ref<Announcement[]>([]);
 const paused = ref(false);
 const autoDrop = ref(false);
+/** The board's arrow-key steps, so unset step sliders sit at the default in use. */
+const keySteps = ref<KeySteps>();
 const TABS = [
   { id: 'configure', label: 'Configure' },
   { id: 'observe', label: 'Observe' },
@@ -94,21 +97,34 @@ onMounted(() => {
   sizer.observe(host.value);
   remounts.observe(host.value, { childList: true, subtree: true });
   board.apply(snapshot());
+  keySteps.value = board.keySteps();
 });
 onBeforeUnmount(() => {
   sizer.disconnect();
   remounts.disconnect();
   board?.destroy();
 });
-watch(config, () => board?.apply(snapshot()), { deep: true });
+watch(
+  config,
+  () => {
+    board?.apply(snapshot());
+    keySteps.value = board?.keySteps();
+  },
+  { deep: true },
+);
 
 // Side by side, the panel ends where the board's canvas does (not its attribution link). The
 // canvas arrives after mount and is replaced on remount, so each fit re-targets the observer.
 const panel = ref<HTMLElement>();
 const panelMaxHeight = ref<string>();
 let canvas: HTMLCanvasElement | null = null;
-const sizer = new ResizeObserver(() => fitPanel());
-const remounts = new MutationObserver(() => fitPanel());
+// A resize or remount can move the drop zone, and with it the default lift steps.
+const onBoardChange = () => {
+  fitPanel();
+  keySteps.value = board?.keySteps();
+};
+const sizer = new ResizeObserver(onBoardChange);
+const remounts = new MutationObserver(onBoardChange);
 function fitPanel() {
   const next = host.value?.querySelector('canvas') ?? null;
   if (next !== canvas) {
@@ -256,7 +272,7 @@ const tint = (hex: string) => `${hex}40`;
               <button v-if="config.controls[s.key] !== null" type="button" class="link" @click.prevent="setOptional(s.key, null)">reset</button>
             </span>
             <input
-              :value="config.controls[s.key] ?? 0.25"
+              :value="config.controls[s.key] ?? keySteps?.[s.key] ?? s.min"
               type="range"
               :min="s.min"
               :max="s.max"
@@ -284,10 +300,20 @@ const tint = (hex: string) => `${hex}40`;
 
         <details>
           <summary>Physics <small>remount</small></summary>
-          <label v-for="s in PHYSICS_SLIDERS" :key="s.key" class="slider" :title="s.hint">
-            <span>{{ s.label }} <output>{{ config.physics[s.key] }}</output></span>
-            <input v-model.number="config.physics[s.key]" type="range" :min="s.min" :max="s.max" :step="s.step" />
-          </label>
+          <template v-for="s in PHYSICS_SLIDERS" :key="s.key">
+            <label class="slider">
+              <span>{{ s.label }} <output>{{ config.physics[s.key] }}</output></span>
+              <input
+                v-model.number="config.physics[s.key]"
+                type="range"
+                :min="s.min"
+                :max="s.max"
+                :step="s.step"
+                :aria-describedby="`physics-${s.key}-hint`"
+              />
+            </label>
+            <p :id="`physics-${s.key}-hint`" class="slider-hint">{{ s.hint }}</p>
+          </template>
           <label class="check"><input v-model="config.physics.chipCollisions" type="checkbox" /> Chips bounce off each other</label>
           <label class="field">
             Seed
@@ -561,6 +587,12 @@ input[type='color'] {
   display: grid;
   font-size: 14px;
   margin-top: 8px;
+}
+.slider-hint {
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  font-style: italic;
+  margin: 2px 0 0;
 }
 .slider span {
   display: flex;

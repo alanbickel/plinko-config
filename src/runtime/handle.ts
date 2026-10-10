@@ -1,6 +1,7 @@
 // The public handle returned by createPlinko().
 
 import { type BoardContext, heldChip } from './context';
+import { keySteps } from './input/attach';
 import { applyPause } from './observe';
 import { requestChips, supplyChanged } from './supply';
 import type { DropOptions, PlinkoBoard, Settled, SupplyController } from './types';
@@ -20,6 +21,7 @@ export function createHandle({ ctx, teardown }: HandleInput): PlinkoBoard {
     pickUp: (chipId) => machine.pickUp(chipId),
     aim: (x) => machine.aim(x),
     cancel: () => machine.cancel(),
+    keySteps: () => keySteps(ctx),
     drop: (options = {}) => drop(ctx, options),
     supply: supplyController(ctx),
     pause: () => setPausedByHost(ctx, true),

@@ -41,6 +41,8 @@ These options shape the board itself, so they can only be set at mount: `slots`,
 
 Everything else can be updated: callbacks, `labels`, `theme`, per-slot and per-chip styles, `slotLabels`, `motion`, `keys`, step sizes, `autoReload`, and `maxInFlight`. `update()` validates the whole update first, so an invalid value changes nothing. A change to the theme, styles, or slot labels refits and redraws the board. Callbacks and labels take effect from the next event on.
 
+`board.keySteps()` reports the step sizes the arrow keys use, with defaults filled in. The default up and down steps are one and four peg rows, so they change when the slot label layout or the board's size moves the drop zone.
+
 ## Pause
 
 `board.pause()` freezes the simulation and drawing, and `board.resume()` continues. The board also pauses by itself while it's scrolled out of view. Chips in flight stop where they are and carry on when it resumes.

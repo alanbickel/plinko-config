@@ -36,11 +36,9 @@ export function updateBoard(ctx: BoardContext, update: BoardUpdate): void {
   applyLabels(ctx.dom, config.labels);
   const restyled = ctx.view.setLook(look);
   const relabelled = ctx.view.setSlotLabels(config.slotLabels);
-  ctx.carry = ctx.view.carry;
   ctx.machine.configure({
     maxInFlight: config.maxInFlight,
     autoReload: config.autoReload,
-    dropZoneFrom: ctx.carry.zoneFrom,
   });
   if (restyled || relabelled) fitToHost(ctx);
   applyMotion(ctx);

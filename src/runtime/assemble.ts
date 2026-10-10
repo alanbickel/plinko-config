@@ -24,13 +24,12 @@ export interface AssembleInput {
 }
 
 /** The parts that don't need the finished context. */
-type BaseContext = Omit<BoardContext, 'machine' | 'loop' | 'carry'>;
+type BaseContext = Omit<BoardContext, 'machine' | 'loop'>;
 
 export function assemble({ host, options }: AssembleInput): BoardContext {
   const base = createBase({ host, options });
   // The machine and loop close over the context; nothing calls them until the board is ready.
   const ctx = base as BoardContext;
-  ctx.carry = base.view.carry; // the label plan decides where the tray, and so the carry, starts
   ctx.machine = createMachine(ctx);
   ctx.loop = createLoop(ctx);
   return ctx;
@@ -97,12 +96,12 @@ function createMachine(ctx: BoardContext): CommandMachine {
       commit: (kindId) => ctx.supply.commit(kindId),
       release: (kindId) => ctx.supply.release(kindId),
       inFlight: () => ctx.world.flying.length,
+      dropZoneFrom: () => ctx.view.carry.zoneFrom,
       spawn: (kindId, x) => ctx.world.spawn({ kindId, x, seed: ctx.ui.pendingSeed }).id,
     },
     kindIds: ctx.kindIds,
     maxInFlight: ctx.config.maxInFlight,
     autoReload: ctx.config.autoReload,
-    dropZoneFrom: ctx.carry.zoneFrom,
     notify: (notice: Notice) => {
       dispatchByType(handlers, notice);
       (CHANGES_SUPPLY.has(notice.type) ? supplyChanged : refresh)(ctx);
