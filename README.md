@@ -2,6 +2,8 @@
 
 _A delightfully sinister UI component._
 
+![A Plinko board with Light, Dark, and System slots. Three chips are dragged onto it one at a time; as each lands, the card below switches to that theme.](https://raw.githubusercontent.com/alanbickel/plinko-config/main/.github/readme.gif)
+
 ## Gamify your settings. Drive your app with Plinko.
 
 - A highly configurable, framework-agnostic UI component that's designed to gamify settings and configuration management (or any other event-driven workflow) in any application.
