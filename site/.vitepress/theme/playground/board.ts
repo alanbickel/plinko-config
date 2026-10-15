@@ -1,7 +1,14 @@
 // Drives the playground's board: mounts it, sends live changes through update(), and rebuilds it
 // (after a short pause) when a mount-only option changes.
 
-import { createPlinko, type KeySteps, type PlinkoBoard, type PlinkoOptions } from 'plinko-config';
+import {
+  createPlinko,
+  type FullReason,
+  type KeySteps,
+  type PlinkoBoard,
+  type PlinkoOptions,
+  type SupplySnapshot,
+} from 'plinko-config';
 import { answerRequest, liveOptions, mountOptions, type PlaygroundConfig } from './config';
 
 export interface LogEntry {
@@ -29,7 +36,13 @@ export interface PlaygroundBoardInput {
   onLog: (entry: LogEntry) => void;
   /** What the board's live region says, as a screen reader would hear it. */
   onAnnounce: (entry: Announcement) => void;
+  /** A chip left the drop zone and is falling. */
+  onDrop: () => void;
   onResult: (result: DropResult) => void;
+  /** Chips left per kind: on every change, and for each fresh board. */
+  onSupply: (snapshot: SupplySnapshot) => void;
+  /** The board locked for good. */
+  onFull: (reason: FullReason) => void;
   /** A fresh board was built, so its piles are empty. */
   onReset: () => void;
   /** An invalid option (PlinkoConfigError), or '' once the board is valid again. */
@@ -53,13 +66,19 @@ const AUTO_DROP_MS = 600;
 
 interface Sinks {
   log: (callback: string, text: string) => void;
+  drop: () => void;
   result: (result: DropResult) => void;
+  supply: (snapshot: SupplySnapshot) => void;
+  full: (reason: FullReason) => void;
 }
 
-function callbacks({ log, result }: Sinks, current: () => PlaygroundConfig) {
+function callbacks({ log, drop, result, supply, full }: Sinks, current: () => PlaygroundConfig) {
   return {
     onPickUp: ({ chip }) => log('onPickUp', chip.label),
-    onDrop: ({ chip, dropX }) => log('onDrop', `${chip.label} at x = ${dropX.toFixed(2)}`),
+    onDrop: ({ chip, dropX }) => {
+      log('onDrop', `${chip.label} at x = ${dropX.toFixed(2)}`);
+      drop();
+    },
     onLand: ({ chip, slot, pegHits, durationMs }) => {
       log('onLand', `${chip.label} → ${slot.label} (${pegHits} pegs, ${durationMs} ms)`);
       result({ chipId: chip.id, slotId: slot.id });
@@ -68,7 +87,11 @@ function callbacks({ log, result }: Sinks, current: () => PlaygroundConfig) {
       log('onMiss', `${chip.label} didn't reach a slot`);
       result({ chipId: chip.id, slotId: null });
     },
-    onFull: ({ reason }) => log('onFull', `locked: ${reason}`),
+    onFull: ({ reason }) => {
+      log('onFull', `locked: ${reason}`);
+      full(reason);
+    },
+    onSupplyChange: supply,
     onExhausted: ({ chip }) => log('onExhausted', `no ${chip.label} chips left`),
     onRequest: async ({ chip }) => {
       const answer = await answerRequest(current().supply.answer);
@@ -92,7 +115,10 @@ class Controller implements PlaygroundBoard {
     this.hooks = callbacks(
       {
         log: (callback, text) => input.onLog({ at: this.elapsed(), callback, text }),
+        drop: input.onDrop,
         result: input.onResult,
+        supply: input.onSupply,
+        full: input.onFull,
       },
       () => this.config as PlaygroundConfig,
     );
@@ -121,6 +147,7 @@ class Controller implements PlaygroundBoard {
       this.mountedKey = JSON.stringify(mountOptions(config));
       this.watchAnnouncements(next);
       this.input.onReset();
+      this.input.onSupply(next.supply.get());
     });
   }
 

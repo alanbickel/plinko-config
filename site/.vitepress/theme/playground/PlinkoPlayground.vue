@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The playground view. Logic lives in config.ts, board.ts and export.ts (type-checked); this file
 // only binds controls to the config and shows the outputs.
-import type { KeySteps } from 'plinko-config';
+import type { FullReason, KeySteps, SupplySnapshot } from 'plinko-config';
 import { useData } from 'vitepress';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import {
@@ -48,6 +48,10 @@ const copied = ref(false);
 /** Chips per slot id, then per chip id, since the board was last built. */
 const tally = ref<Record<string, Record<string, number>>>({});
 const missed = ref(0);
+/** Chips dropped since the board was last built; those not landed or missed are still falling. */
+const dropped = ref(0);
+const supply = ref<SupplySnapshot>();
+const locked = ref<FullReason>();
 let board: PlaygroundBoard | undefined;
 
 const MAX_LOG = 200;
@@ -67,6 +71,20 @@ const histogram = computed(() => {
   return { columns, landed, max: Math.max(1, ...columns.map((column) => column.total)) };
 });
 
+const LOCK_REASONS: Record<FullReason, string> = {
+  slots: 'every slot is full',
+  overflow: 'a pile reached the drop line',
+  exhausted: 'no chips left to come back',
+};
+const chipsLeft = computed(() =>
+  Object.entries(supply.value?.counts ?? {}).map(([id, count]) => ({
+    id,
+    label: config.chips.find((chip) => chip.id === id)?.label ?? id,
+    count: count === Number.POSITIVE_INFINITY ? '∞' : String(count),
+  })),
+);
+const falling = computed(() => dropped.value - histogram.value.landed - missed.value);
+
 onMounted(() => {
   if (!host.value) return;
   board = createPlaygroundBoard({
@@ -77,6 +95,9 @@ onMounted(() => {
     onAnnounce: (entry) => {
       transcript.value = [entry, ...transcript.value].slice(0, MAX_LOG);
     },
+    onDrop: () => dropped.value++,
+    onSupply: (snapshot) => (supply.value = snapshot),
+    onFull: (reason) => (locked.value = reason),
     onResult: ({ chipId, slotId }) => {
       if (slotId === null) {
         missed.value++;
@@ -89,6 +110,8 @@ onMounted(() => {
     onReset: () => {
       tally.value = {};
       missed.value = 0;
+      dropped.value = 0;
+      locked.value = undefined;
     },
     onError: (message) => {
       error.value = message;
@@ -172,6 +195,7 @@ async function copy() {
 }
 
 const seconds = (ms: number) => (ms / 1000).toFixed(1);
+const step = (n: number) => Number(n.toPrecision(3));
 
 // Slot tints sit behind the piles, so they're translucent: #rrggbb plus a 25% alpha byte.
 const DEFAULT_TINT = '#3ec7a8';
@@ -394,6 +418,26 @@ const tint = (hex: string) => `${hex}40`;
       </div>
 
       <div v-show="tab === 'observe'" id="panel-observe" class="stack" role="tabpanel" aria-labelledby="tab-observe">
+        <details open>
+          <summary>State</summary>
+          <dl class="state">
+            <dt>Chips left</dt>
+            <dd>
+              <span v-for="chip in chipsLeft" :key="chip.id" class="chip-left">{{ chip.label }}: {{ chip.count }}</span>
+            </dd>
+            <dt>Falling</dt>
+            <dd>{{ falling }}</dd>
+            <dt>Board</dt>
+            <dd>{{ locked ? `locked: ${LOCK_REASONS[locked]}` : 'open' }}</dd>
+            <dt>Simulation</dt>
+            <dd>{{ paused ? 'paused' : 'running' }}, auto-drop {{ autoDrop ? 'on' : 'off' }}</dd>
+            <dt>Key steps</dt>
+            <dd v-if="keySteps">
+              aim {{ step(keySteps.aimStep) }} (large {{ step(keySteps.aimStepLarge) }}), lift
+              {{ step(keySteps.liftStep) }} (large {{ step(keySteps.liftStepLarge) }})
+            </dd>
+          </dl>
+        </details>
         <details open>
           <summary>Results</summary>
           <p v-if="histogram.landed + missed === 0" class="empty">Drop chips (or turn on Auto-drop) to see where they land.</p>
@@ -648,6 +692,23 @@ input[type='color'] {
 }
 .empty {
   color: var(--vp-c-text-3);
+}
+.state {
+  display: grid;
+  font-size: 13px;
+  gap: 4px 12px;
+  grid-template-columns: max-content 1fr;
+  margin: 8px 0;
+}
+.state dt {
+  color: var(--vp-c-text-2);
+}
+.state dd {
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+.chip-left:not(:last-child)::after {
+  content: ', ';
 }
 .histogram {
   display: flex;
