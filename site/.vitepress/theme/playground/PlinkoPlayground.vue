@@ -48,8 +48,7 @@ const copied = ref(false);
 /** Chips per slot id, then per chip id, since the board was last built. */
 const tally = ref<Record<string, Record<string, number>>>({});
 const missed = ref(0);
-/** Chips dropped since the board was last built; those not landed or missed are still falling. */
-const dropped = ref(0);
+const falling = ref(0);
 const supply = ref<SupplySnapshot>();
 const locked = ref<FullReason>();
 let board: PlaygroundBoard | undefined;
@@ -83,7 +82,6 @@ const chipsLeft = computed(() =>
     count: count === Number.POSITIVE_INFINITY ? '∞' : String(count),
   })),
 );
-const falling = computed(() => dropped.value - histogram.value.landed - missed.value);
 
 onMounted(() => {
   if (!host.value) return;
@@ -95,7 +93,7 @@ onMounted(() => {
     onAnnounce: (entry) => {
       transcript.value = [entry, ...transcript.value].slice(0, MAX_LOG);
     },
-    onDrop: () => dropped.value++,
+    onFalling: (count) => (falling.value = count),
     onSupply: (snapshot) => (supply.value = snapshot),
     onFull: (reason) => (locked.value = reason),
     onResult: ({ chipId, slotId }) => {
@@ -110,7 +108,7 @@ onMounted(() => {
     onReset: () => {
       tally.value = {};
       missed.value = 0;
-      dropped.value = 0;
+      falling.value = 0;
       locked.value = undefined;
     },
     onError: (message) => {
@@ -424,6 +422,7 @@ const tint = (hex: string) => `${hex}40`;
             <dt>Chips left</dt>
             <dd>
               <span v-for="chip in chipsLeft" :key="chip.id" class="chip-left">{{ chip.label }}: {{ chip.count }}</span>
+              <template v-if="chipsLeft.length === 0">no board yet</template>
             </dd>
             <dt>Falling</dt>
             <dd>{{ falling }}</dd>
@@ -432,9 +431,12 @@ const tint = (hex: string) => `${hex}40`;
             <dt>Simulation</dt>
             <dd>{{ paused ? 'paused' : 'running' }}, auto-drop {{ autoDrop ? 'on' : 'off' }}</dd>
             <dt>Key steps</dt>
-            <dd v-if="keySteps">
-              aim {{ step(keySteps.aimStep) }} (large {{ step(keySteps.aimStepLarge) }}), lift
-              {{ step(keySteps.liftStep) }} (large {{ step(keySteps.liftStepLarge) }})
+            <dd>
+              <template v-if="keySteps">
+                aim {{ step(keySteps.aimStep) }} (large {{ step(keySteps.aimStepLarge) }}), lift
+                {{ step(keySteps.liftStep) }} (large {{ step(keySteps.liftStepLarge) }})
+              </template>
+              <template v-else>no board yet</template>
             </dd>
           </dl>
         </details>
