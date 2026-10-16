@@ -1,7 +1,14 @@
 // Drives the playground's board: mounts it, sends live changes through update(), and rebuilds it
 // (after a short pause) when a mount-only option changes.
 
-import { createPlinko, type KeySteps, type PlinkoBoard, type PlinkoOptions } from 'plinko-config';
+import {
+  createPlinko,
+  type FullReason,
+  type KeySteps,
+  type PlinkoBoard,
+  type PlinkoOptions,
+  type SupplySnapshot,
+} from 'plinko-config';
 import { answerRequest, liveOptions, mountOptions, type PlaygroundConfig } from './config';
 
 export interface LogEntry {
@@ -29,7 +36,13 @@ export interface PlaygroundBoardInput {
   onLog: (entry: LogEntry) => void;
   /** What the board's live region says, as a screen reader would hear it. */
   onAnnounce: (entry: Announcement) => void;
+  /** How many dropped chips haven't landed or missed yet: on each drop and each result. */
+  onFalling: (count: number) => void;
   onResult: (result: DropResult) => void;
+  /** Chips left per kind: on every change, and for each fresh board. */
+  onSupply: (snapshot: SupplySnapshot) => void;
+  /** The board locked for good. */
+  onFull: (reason: FullReason) => void;
   /** A fresh board was built, so its piles are empty. */
   onReset: () => void;
   /** An invalid option (PlinkoConfigError), or '' once the board is valid again. */
@@ -53,13 +66,19 @@ const AUTO_DROP_MS = 600;
 
 interface Sinks {
   log: (callback: string, text: string) => void;
+  drop: () => void;
   result: (result: DropResult) => void;
+  supply: (snapshot: SupplySnapshot) => void;
+  full: (reason: FullReason) => void;
 }
 
-function callbacks({ log, result }: Sinks, current: () => PlaygroundConfig) {
+function callbacks({ log, drop, result, supply, full }: Sinks, current: () => PlaygroundConfig) {
   return {
     onPickUp: ({ chip }) => log('onPickUp', chip.label),
-    onDrop: ({ chip, dropX }) => log('onDrop', `${chip.label} at x = ${dropX.toFixed(2)}`),
+    onDrop: ({ chip, dropX }) => {
+      log('onDrop', `${chip.label} at x = ${dropX.toFixed(2)}`);
+      drop();
+    },
     onLand: ({ chip, slot, pegHits, durationMs }) => {
       log('onLand', `${chip.label} → ${slot.label} (${pegHits} pegs, ${durationMs} ms)`);
       result({ chipId: chip.id, slotId: slot.id });
@@ -68,7 +87,11 @@ function callbacks({ log, result }: Sinks, current: () => PlaygroundConfig) {
       log('onMiss', `${chip.label} didn't reach a slot`);
       result({ chipId: chip.id, slotId: null });
     },
-    onFull: ({ reason }) => log('onFull', `locked: ${reason}`),
+    onFull: ({ reason }) => {
+      log('onFull', `locked: ${reason}`);
+      full(reason);
+    },
+    onSupplyChange: supply,
     onExhausted: ({ chip }) => log('onExhausted', `no ${chip.label} chips left`),
     onRequest: async ({ chip }) => {
       const answer = await answerRequest(current().supply.answer);
@@ -85,6 +108,12 @@ class Controller implements PlaygroundBoard {
   private rebuildTimer: ReturnType<typeof setTimeout> | undefined;
   private autoDropTimer: ReturnType<typeof setInterval> | undefined;
   private liveObserver: MutationObserver | undefined;
+  /** Each new board starts running, so a pause is applied again after every rebuild. */
+  private paused = false;
+  /** Chips the current board dropped that haven't landed or missed yet. */
+  private falling = 0;
+  /** Set while `build()` creates a board. */
+  private building: { locked?: FullReason } | undefined;
   private readonly start = performance.now();
   private readonly hooks: Partial<PlinkoOptions>;
 
@@ -92,7 +121,16 @@ class Controller implements PlaygroundBoard {
     this.hooks = callbacks(
       {
         log: (callback, text) => input.onLog({ at: this.elapsed(), callback, text }),
-        result: input.onResult,
+        drop: () => input.onFalling(++this.falling),
+        result: (result) => {
+          input.onFalling(--this.falling);
+          input.onResult(result);
+        },
+        supply: input.onSupply,
+        full: (reason) => {
+          if (this.building) this.building.locked = reason;
+          else input.onFull(reason);
+        },
       },
       () => this.config as PlaygroundConfig,
     );
@@ -113,18 +151,21 @@ class Controller implements PlaygroundBoard {
     const { config } = this;
     if (!config) return;
     this.run(() => {
-      const options = { ...mountOptions(config), ...this.hooks } as PlinkoOptions;
-      const next = createPlinko(this.input.host, options);
+      const { board: next, locked } = this.build(config);
       this.board?.destroy();
       this.board = next;
       next.update(liveOptions(config));
+      if (this.paused) next.pause();
       this.mountedKey = JSON.stringify(mountOptions(config));
       this.watchAnnouncements(next);
+      this.falling = 0;
       this.input.onReset();
+      if (locked) this.input.onFull(locked);
     });
   }
 
   setPaused(paused: boolean): void {
+    this.paused = paused;
     if (paused) this.board?.pause();
     else this.board?.resume();
   }
@@ -147,6 +188,21 @@ class Controller implements PlaygroundBoard {
     this.liveObserver?.disconnect();
     this.board?.destroy();
     this.board = undefined;
+  }
+
+  /**
+   * Creates a board. One with no chips at all locks while it's created, before `onReset` clears
+   * the last board's state, so that lock is held back and returned instead of reported.
+   */
+  private build(config: PlaygroundConfig): { board: PlinkoBoard; locked?: FullReason } {
+    const building: { locked?: FullReason } = {};
+    this.building = building;
+    try {
+      const options = { ...mountOptions(config), ...this.hooks } as PlinkoOptions;
+      return { board: createPlinko(this.input.host, options), locked: building.locked };
+    } finally {
+      this.building = undefined;
+    }
   }
 
   private elapsed(): number {
