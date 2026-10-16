@@ -7,12 +7,19 @@ You're reviewing pull request #$ARGUMENTS on plinko-config as an independent rev
 
 ## Setup
 
-1. `gh pr view $ARGUMENTS` and `gh pr diff $ARGUMENTS`. Read the issue the PR closes (`gh issue view <n>`).
-2. Read `CLAUDE.md` and `CONTRIBUTING.md`. Their standards are the review criteria.
-3. Another session may be working in this checkout, so don't switch branches here. Review in a separate worktree:
+1. Look up the PR, its head branch, the issues it closes, and earlier reviews, then the inline comment threads (author replies appear only there):
    ```
+   gh pr view $ARGUMENTS --json title,body,headRefName,headRefOid,closingIssuesReferences,reviews
+   gh api repos/{owner}/{repo}/pulls/$ARGUMENTS/comments
+   gh pr diff $ARGUMENTS
+   ```
+   Read each issue it closes (`gh issue view <n>`).
+2. Read `CLAUDE.md` and `CONTRIBUTING.md`. Their standards are the review criteria.
+3. Another session may be working in this checkout, so don't switch branches here. Review in a separate worktree (the first line clears one left by an earlier run):
+   ```
+   git worktree remove --force ../plinko-review-$ARGUMENTS 2>/dev/null; git worktree prune
    git fetch origin
-   git worktree add ../plinko-review-$ARGUMENTS origin/<head-branch>
+   git worktree add ../plinko-review-$ARGUMENTS origin/<headRefName>
    ```
    In the worktree, run `npm ci`, and `npm ci` in `site/` too (`npm run docs:examples` needs it).
    When you're done, remove it with `git worktree remove --force ../plinko-review-$ARGUMENTS`.
@@ -21,8 +28,14 @@ You're reviewing pull request #$ARGUMENTS on plinko-config as an independent rev
 
 If the PR already has a review whose body starts with `🤖 Claude review:`, this is a follow-up round:
 
-- For each earlier finding, read the author's reply and the commit it names. Check that the fix works and that it has a test where one applies (see "Definition of done" below).
-- Review only the commits after that review (`git log <reviewed-sha>..`). Don't repeat earlier findings that were fixed.
+- For each earlier finding, read the author's reply in its comment thread and the commit the reply names. Check that the fix works and that it has a test where one applies (see "Definition of done" below).
+- Review only what changed since the latest Claude review. Get the commit it reviewed (a full SHA) and fetch it, since a rebase may have removed it from the branch:
+  ```
+  gh pr view $ARGUMENTS --json reviews --jq '[.reviews[] | select(.body | startswith("🤖 Claude review:"))] | last | .commit.oid'
+  git fetch origin <sha>
+  ```
+  If `git merge-base --is-ancestor <sha> HEAD` succeeds, use `git log -p <sha>..HEAD`. If not, the branch was rebased (this project syncs by rebasing onto main), so compare with `git range-diff origin/main...<sha> origin/main...HEAD`. If the SHA can't be fetched, review the whole PR again and say so in the summary.
+- Don't repeat earlier findings that were fixed.
 
 ## What to check
 
@@ -69,7 +82,8 @@ gh api repos/{owner}/{repo}/pulls/$ARGUMENTS/reviews --method POST --input revie
 ```
 
 - `event` must be `COMMENT`. The PR author is the same GitHub account, so APPROVE and REQUEST_CHANGES fail.
-- Start every comment body with `🤖 Claude review:`, because the comments post under the maintainer's account.
+- Start the summary body and every inline comment body with `🤖 Claude review:`. The comments post under the maintainer's account, and follow-up mode finds earlier rounds by that prefix.
+- Anchor inline comments on lines inside the diff. GitHub rejects the whole review if any comment points outside it. Put findings about other lines in the summary, with `path:line`.
 - Tag each finding **[blocking]**, **[should fix]** or **[nit]**, and add confirmed or suspected.
 - For each finding, say what's wrong, give a way to reproduce it (steps, a command, or a test that fails), and suggest a fix.
 - Report at most 8 findings, the most important first. Leave out style points that Biome already enforces.
