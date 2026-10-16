@@ -17,12 +17,12 @@ You're reviewing pull request #$ARGUMENTS on plinko-config as an independent rev
 2. Read `CLAUDE.md` and `CONTRIBUTING.md`. Their standards are the review criteria.
 3. Another session may be working in this checkout, so don't switch branches here. Review in a separate worktree (the first line clears one left by an earlier run):
    ```
-   git worktree remove --force ../plinko-review-$ARGUMENTS 2>/dev/null; git worktree prune
+   rm -rf ../plinko-review-$ARGUMENTS; git worktree prune
    git fetch origin
    git worktree add ../plinko-review-$ARGUMENTS origin/<headRefName>
    ```
    In the worktree, run `npm ci`, and `npm ci` in `site/` too (`npm run docs:examples` needs it).
-   When you're done, remove it with `git worktree remove --force ../plinko-review-$ARGUMENTS`.
+   When you're done, remove it with `rm -rf ../plinko-review-$ARGUMENTS; git worktree prune`. (On Windows, `git worktree remove` fails on long `node_modules` paths and leaves the directory behind.)
 
 ## Follow-up mode
 
@@ -34,7 +34,7 @@ If the PR already has a review whose body starts with `🤖 Claude review:`, thi
   gh pr view $ARGUMENTS --json reviews --jq '[.reviews[] | select(.body | startswith("🤖 Claude review:"))] | last | .commit.oid'
   git fetch origin <sha>
   ```
-  If `git merge-base --is-ancestor <sha> HEAD` succeeds, use `git log -p <sha>..HEAD`. If not, the branch was rebased (this project syncs by rebasing onto main), so compare with `git range-diff origin/main...<sha> origin/main...HEAD`. If the SHA can't be fetched, review the whole PR again and say so in the summary.
+  If `git merge-base --is-ancestor <sha> HEAD` succeeds, use `git log -p <sha>..HEAD`. If not, the branch was rebased (this project syncs by rebasing onto main), so compare with `git range-diff origin/main..<sha> origin/main..HEAD`. If the SHA can't be fetched, review the whole PR again and say so in the summary.
 - Don't repeat earlier findings that were fixed.
 
 ## What to check
