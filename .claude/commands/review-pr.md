@@ -29,12 +29,15 @@ You're reviewing pull request #$ARGUMENTS on plinko-config as an independent rev
 If the PR already has a review whose body starts with `🤖 Claude review:`, this is a follow-up round:
 
 - For each earlier finding, read the author's reply in its comment thread and the commit the reply names. Check that the fix works and that it has a test where one applies (see "Definition of done" below).
-- Review only what changed since the latest Claude review. Get the commit it reviewed (a full SHA) and fetch it, since a rebase may have removed it from the branch:
+- Review only what changed since the latest Claude review. Get the commit it reviewed (a full SHA):
   ```
   gh pr view $ARGUMENTS --json reviews --jq '[.reviews[] | select(.body | startswith("🤖 Claude review:"))] | last | .commit.oid'
-  git fetch origin <sha>
   ```
-  If `git merge-base --is-ancestor <sha> HEAD` succeeds, use `git log -p <sha>..HEAD`. If not, the branch was rebased (this project syncs by rebasing onto main), so compare with `git range-diff origin/main..<sha> origin/main..HEAD`. If the SHA can't be fetched, review the whole PR again and say so in the summary.
+  Branches sync with main by merging, never by rebasing, so that commit is still on the branch. Review the branch's own commits since then, leaving out what came in from main:
+  ```
+  git log -p --first-parent --no-merges <sha>..HEAD
+  ```
+  For each merge from main in that range (`git log --first-parent --merges <sha>..HEAD`), check only how its conflicts were resolved with `git show --remerge-diff <merge>`. If `git merge-base --is-ancestor <sha> HEAD` fails, the branch was force-pushed: review the whole PR again and say so in the summary.
 - Don't repeat earlier findings that were fixed.
 
 ## What to check
