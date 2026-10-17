@@ -181,6 +181,7 @@ type WorldEvent = LandedEvent | MissedEvent;
 
 - Unit tests sit next to the code (`foo.ts` → `foo.test.ts`) and run in Node.
 - DOM tests opt into jsdom with `// @vitest-environment jsdom` on the first line.
+- The docs playground's logic (`site/.vitepress/theme/playground/**/*.test.ts`) is its own Vitest project: jsdom throughout, with `plinko-config` resolved to `src/`, so it runs before a build. `npx vitest run --project playground` runs just those tests.
 - Anything that needs real layout, canvas, or focus goes in `e2e/` (Playwright). Specs mount the built package on `e2e/harness/` with `mountBoard` or `mountElement` from `e2e/fixtures.ts`, never on the demo pages. Running `playwright test` directly needs a fresh `npm run build`; the suite refuses a `dist/` older than `src/`.
 - A regression test says which bug it guards against.
 - The coding standards apply to tests too. Biome skips the length check there, since a `describe` block groups many tests; keep each test itself within the rule of 30.
