@@ -206,7 +206,7 @@ So we're parking it. The setup is still here (`npm run mutate`, `stryker.config.
 - Each change starts as a GitHub issue labeled `feature`, `fix`, `chore`, `docs`, `test` or `a11y`, and gets its own branch named `<label>/issue-<number>-short-slug`, for example `feature/issue-1-state-pane`.
 - PRs are squash-merged, so the PR title becomes the commit message on `main`: write it as one line saying what the change does. Put `Closes #<number>` in the PR description. Commits on the branch don't need tidying.
 - Only sync with `main` when you need to (a conflict, or CI needs a change from `main`), and do it by merging `main` into the branch. Don't rebase or force-push a branch that's under review: reviewers and review replies point at its commits.
-- If your branch was cut from another PR's branch and that PR is merged first, move your commits onto `main` with `git rebase --onto main <parent-branch>`.
+- If your branch was cut from another PR's branch and that PR is merged first, merge `main` into your branch as usual. The squash commit holds the same changes as the parent's commits your branch already has, so they usually merge cleanly; if the parent changed after you branched, resolve the conflicts in the merge.
 
 ## Releasing
 

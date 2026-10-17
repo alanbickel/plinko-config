@@ -19,8 +19,9 @@ You're reviewing pull request #$ARGUMENTS on plinko-config as an independent rev
    ```
    rm -rf ../plinko-review-$ARGUMENTS; git worktree prune
    git fetch origin
-   git worktree add ../plinko-review-$ARGUMENTS origin/<headRefName>
+   git worktree add ../plinko-review-$ARGUMENTS <headRefOid>
    ```
+   Use the `headRefOid` from step 1, not the branch, so the worktree and the posted review are at the same commit even if the author pushes meanwhile.
    In the worktree, run `npm ci`, and `npm ci` in `site/` too (`npm run docs:examples` needs it).
    When you're done, remove it with `rm -rf ../plinko-review-$ARGUMENTS; git worktree prune`. (On Windows, `git worktree remove` fails on long `node_modules` paths and leaves the directory behind.)
 
@@ -76,6 +77,7 @@ gh api repos/{owner}/{repo}/pulls/$ARGUMENTS/reviews --method POST --input revie
 
 ```json
 {
+  "commit_id": "<headRefOid from Setup step 1>",
   "event": "COMMENT",
   "body": "<summary>",
   "comments": [
@@ -84,6 +86,7 @@ gh api repos/{owner}/{repo}/pulls/$ARGUMENTS/reviews --method POST --input revie
 }
 ```
 
+- Set `commit_id` to the commit you reviewed. Without it, GitHub records whatever the head is when the review posts, and the next follow-up round would skip any commits pushed in between.
 - `event` must be `COMMENT`. The PR author is the same GitHub account, so APPROVE and REQUEST_CHANGES fail.
 - Start the summary body and every inline comment body with `🤖 Claude review:`. The comments post under the maintainer's account, and follow-up mode finds earlier rounds by that prefix.
 - Anchor inline comments on lines inside the diff. GitHub rejects the whole review if any comment points outside it. Put findings about other lines in the summary, with `path:line`.
