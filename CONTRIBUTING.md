@@ -201,6 +201,13 @@ We explored [Stryker](https://stryker-mutator.io/) for mutation testing: it plan
 
 So we're parking it. The setup is still here (`npm run mutate`, `stryker.config.mjs`), but its scores aren't meaningful for now; `scripts/sabotage.ts` covers the same question for the sizing and label code. This is open for future investigation: a newer Stryker or Vitest may fix it, and `fitWidth` in `src/runtime/sizing.ts` makes a good first check, since its tests kill every planted mutant by hand.
 
+## Branches and pull requests
+
+- Each change starts as a GitHub issue labeled `feature`, `fix`, `chore`, `docs`, `test` or `a11y`, and gets its own branch named `<label>/issue-<number>-short-slug`, for example `feature/issue-1-state-pane`.
+- PRs are squash-merged, so the PR title becomes the commit message on `main`: write it as one line saying what the change does. Put `Closes #<number>` in the PR description. Commits on the branch don't need tidying.
+- Only sync with `main` when you need to (a conflict, or CI needs a change from `main`), and do it by merging `main` into the branch. Don't rebase or force-push a branch that's under review: reviewers and review replies point at its commits.
+- If your branch was cut from another PR's branch and that PR is merged first, merge `main` into your branch as usual. The squash commit holds the same changes as the parent's commits your branch already has, so they usually merge cleanly; if the parent changed after you branched, resolve the conflicts in the merge.
+
 ## Releasing
 
 Releases run from `.github/workflows/release.yml` on every push to `main`. CI and the docs build always run. If the `version` in `package.json` isn't on npm yet, the workflow publishes it with provenance (npm trusted publishing, no token), tags it `vX.Y.Z`, creates a GitHub Release with generated notes, and deploys the docs to GitHub Pages, so the docs match the published package.
