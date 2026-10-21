@@ -27,8 +27,15 @@ const MAX_AGE_STEPS = 60 / STEP;
 const HIT_SPEED = 1;
 /** Sideways push while resting on a peg, rail cap, wall bump, or piled chip, units/s². */
 const ROLL_OFF_ACCEL = 6;
-/** Peak horizontal pull of a bias weight, units/s². */
+/** Peak horizontal pull per unit of bias pull (a slot's width from its center), units/s². */
 const BIAS_STRENGTH = 6;
+/** Sideways damping per unit of bias pull, 1/s. */
+const BIAS_DAMPING = 0.5;
+/**
+ * Bias pull levels off toward this. Much stronger pulls overpower gravity and pin chips on pegs,
+ * so heavier weights approach a sure landing rather than overshoot.
+ */
+const BIAS_CEILING = 50;
 
 export type ChipOutcome = 'landed' | 'missed';
 
@@ -51,6 +58,8 @@ export interface ChipBody {
   nudges: number;
   /** Resting on a landed chip this step. */
   onPile: boolean;
+  /** Resting on something round this step, rolling off it. */
+  rolling: boolean;
   /** Set once settled. */
   outcome?: ChipOutcome;
   /** Set only for a valid landing. */
@@ -180,6 +189,7 @@ export class World {
       stillFrom: pos,
       nudges: 0,
       onPile: false,
+      rolling: false,
     };
     this.flying.push(chip);
     return chip;
@@ -205,24 +215,35 @@ export class World {
 
   private integrate(chip: ChipBody): void {
     const { gravity, maxSpeed } = this.physics;
-    const ax = chip.pos.y > this.biasStartY ? this.biasAccel(chip.pos.x) : 0;
+    // Slot centers line up with pegs every other row, so a chip rolling off one gets no pull:
+    // pulled back toward the center, it would stay balanced on the peg.
+    const pulled = chip.pos.y > this.biasStartY && !chip.rolling;
+    const ax = pulled ? this.biasAccel(chip) : 0;
     chip.vel = vec2(chip.vel.x + ax * STEP, chip.vel.y + gravity * STEP).clampLength(maxSpeed);
     chip.pos = chip.pos.add(chip.vel.scale(STEP));
     chip.ageSteps++;
   }
 
-  private biasAccel(x: number): number {
+  /**
+   * Toward each slot weighted above 1, away from each below 1. The pull eases off at the slot
+   * center and damps sideways speed, so chips settle in rather than overshoot.
+   */
+  private biasAccel({ pos, vel }: ChipBody): number {
     let ax = 0;
     this.physics.bias.forEach((weight, i) => {
       if (weight === 1) return;
-      const dx = i + 0.5 - x;
-      ax += ((weight - 1) * BIAS_STRENGTH * Math.sign(dx)) / (1 + dx * dx);
+      const pull = biasPull(weight);
+      const dx = i + 0.5 - pos.x;
+      const falloff = 1 / (1 + dx * dx);
+      ax += pull * BIAS_STRENGTH * 2 * dx * falloff;
+      if (pull > 0) ax -= pull * BIAS_DAMPING * vel.x * falloff;
     });
     return ax;
   }
 
   private collideStatic(chip: ChipBody): void {
     chip.onPile = false;
+    chip.rolling = false;
     for (const circle of this.grid.near(chip.pos)) this.touchCircle(chip, circle);
     for (const b of this.layout.boxes) {
       const push = collideCircleBox(
@@ -265,6 +286,7 @@ export class World {
    * rolling off it. Overflowing piles spill into neighbouring slots this way.
    */
   private rollOff(chip: ChipBody, circle: StaticCircle): void {
+    chip.rolling = true;
     const dx = chip.pos.x - circle.x;
     const dir = dx !== 0 ? Math.sign(dx) : chip.rng.sign();
     chip.vel = vec2(chip.vel.x + dir * ROLL_OFF_ACCEL * STEP, chip.vel.y);
@@ -366,6 +388,12 @@ export class World {
 
 function midpoint(values: readonly number[]): number {
   return ((values[0] ?? 0) + (values[values.length - 1] ?? 0)) / 2;
+}
+
+/** A bias weight's pull: negative pushes away; above 1 it rises toward BIAS_CEILING. */
+function biasPull(weight: number): number {
+  const pull = weight - 1;
+  return pull > 0 ? pull / (1 + pull / BIAS_CEILING) : pull;
 }
 
 /** Counts steps spent near one spot; moving away restarts the count from the new spot. */

@@ -1,6 +1,7 @@
 // Headless Plinko: drops chips one at a time and prints where they landed.
 //   npm run sim -- --slots 7 --rows 8 --drops 10000 --x random --seed 1
 //   --x is a drop position in [0, 1] or "random". --pile keeps landed chips (piles up).
+//   --bias s2=8 weights a slot (physics.bias); repeat it for more slots.
 import { parseArgs } from 'node:util';
 import { buildLayout } from '../src/core/layout';
 import { resolveCoreOptions } from '../src/core/options';
@@ -14,16 +15,23 @@ const { values: args } = parseArgs({
     x: { type: 'string', default: 'random' },
     seed: { type: 'string', default: '1' },
     pile: { type: 'boolean', default: false },
+    bias: { type: 'string', multiple: true, default: [] },
   },
 });
 
 const slotCount = Number(args.slots);
 const drops = Number(args.drops);
+const bias = Object.fromEntries(
+  args.bias.map((pair) => {
+    const [id = '', weight] = pair.split('=');
+    return [id, Number(weight)];
+  }),
+);
 const options = resolveCoreOptions({
   slots: Array.from({ length: slotCount }, (_, i) => ({ id: `s${i}`, label: `Slot ${i}` })),
   chips: [{ id: 'chip', label: 'Chip' }],
   board: { rows: Number(args.rows) },
-  physics: { seed: Number(args.seed) },
+  physics: { seed: Number(args.seed), bias },
 });
 const world = new World({
   layout: buildLayout(slotCount, options.board),
@@ -59,7 +67,7 @@ const pct = (p: number) => (durations[Math.floor((durations.length - 1) * p)] ??
 const max = Math.max(...counts);
 
 console.log(
-  `\n${drops} drops · ${slotCount} slots · ${args.rows} rows · x=${args.x} · seed=${args.seed}${args.pile ? ' · piling' : ''}\n`,
+  `\n${drops} drops · ${slotCount} slots · ${args.rows} rows · x=${args.x} · seed=${args.seed}${args.bias.length ? ` · bias ${args.bias.join(' ')}` : ''}${args.pile ? ' · piling' : ''}\n`,
 );
 counts.forEach((n, i) => {
   const bar = '█'.repeat(Math.round((n / max) * 40));
