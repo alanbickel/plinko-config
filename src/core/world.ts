@@ -32,10 +32,11 @@ const BIAS_STRENGTH = 6;
 /** Sideways damping per unit of bias pull, 1/s. */
 const BIAS_DAMPING = 0.5;
 /**
- * Bias pull levels off toward this. Much stronger pulls overpower gravity and pin chips on pegs,
- * so heavier weights approach a sure landing rather than overshoot.
+ * Bias pull levels off toward this, per unit of gravity (units/s²). Much stronger pulls overpower
+ * gravity and pin chips on pegs, so heavier weights approach a sure landing rather than overshoot.
+ * 50 at the default gravity of 45.
  */
-const BIAS_CEILING = 50;
+const BIAS_CEILING_PER_GRAVITY = 50 / 45;
 
 export type ChipOutcome = 'landed' | 'missed';
 
@@ -156,6 +157,8 @@ export class World {
   private readonly slotFull: boolean[];
   private readonly keepLanded: boolean;
   private readonly biasStartY: number;
+  /** Each slot's bias pull, by slot index; 0 for no bias. */
+  private readonly biasPulls: number[];
   private readonly grid = new CircleGrid();
   private nextId = 0;
   /** Events of the step in progress. */
@@ -167,6 +170,8 @@ export class World {
     this.keepLanded = keepLanded;
     this.slotFull = new Array<boolean>(layout.slotCount).fill(false);
     this.biasStartY = midpoint(layout.pegRows);
+    const ceiling = BIAS_CEILING_PER_GRAVITY * physics.gravity;
+    this.biasPulls = physics.bias.map((weight) => biasPull(weight, ceiling));
     this.insertStatics();
   }
 
@@ -230,9 +235,8 @@ export class World {
    */
   private biasAccel({ pos, vel }: ChipBody): number {
     let ax = 0;
-    this.physics.bias.forEach((weight, i) => {
-      if (weight === 1) return;
-      const pull = biasPull(weight);
+    this.biasPulls.forEach((pull, i) => {
+      if (pull === 0) return;
       const dx = i + 0.5 - pos.x;
       const falloff = 1 / (1 + dx * dx);
       ax += pull * BIAS_STRENGTH * 2 * dx * falloff;
@@ -390,10 +394,10 @@ function midpoint(values: readonly number[]): number {
   return ((values[0] ?? 0) + (values[values.length - 1] ?? 0)) / 2;
 }
 
-/** A bias weight's pull: negative pushes away; above 1 it rises toward BIAS_CEILING. */
-function biasPull(weight: number): number {
+/** A bias weight's pull: negative pushes away; above 1 it rises toward `ceiling`. */
+function biasPull(weight: number, ceiling: number): number {
   const pull = weight - 1;
-  return pull > 0 ? pull / (1 + pull / BIAS_CEILING) : pull;
+  return pull > 0 ? pull / (1 + pull / ceiling) : pull;
 }
 
 /** Counts steps spent near one spot; moving away restarts the count from the new spot. */
