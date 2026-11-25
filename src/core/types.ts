@@ -122,7 +122,12 @@ export interface PhysicsConfig {
   /**
    * Nudges chips toward or away from slots: slot id → weight, a number ≥ 0. Above 1 pulls chips
    * toward that slot, below 1 pushes them away, and 1 (the default for unlisted slots) does
-   * neither. The pull starts halfway down the board.
+   * neither. The pull starts halfway down the board. Heavier weights pull harder, with
+   * diminishing returns, and the strongest pull scales with `gravity`. On an 8-slot, 6-row board
+   * at the default gravity, a weight of 4 about doubles a slot's share, 20 lands about two chips
+   * in three there, and 100 nearly all. Lower gravity gives the pull more time, so the same weight
+   * lands more; at several times the default gravity, chips fall at `maxSpeed` and the same weight
+   * lands fewer.
    */
   bias?: Record<string, number>;
 }

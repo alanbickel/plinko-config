@@ -25,9 +25,9 @@ All distances are in board units: one unit is the horizontal spacing between peg
 
 Each step does the same five things, in order, for the chips in flight:
 
-1. **Move.** Apply gravity, plus any `bias` pull below the middle of the peg field, and cap the speed at `maxSpeed`. The cap also stops chips passing through pegs.
+1. **Move.** Apply gravity, plus any `bias` pull below the middle of the peg field, and cap the speed at `maxSpeed`. The cap also stops chips passing through pegs. The pull eases off at each slot's center and damps sideways speed, so chips settle in rather than overshoot, and it levels off at high weights, at a ceiling proportional to `gravity` so it can't overpower the fall. It pauses while a chip rolls off something round: slot centers line up with pegs every other row, and a pull back toward the center would keep a chip balanced on one.
 2. **Collide with the board.** Push the chip out of any peg, cap, bump, settled chip, wall, rail, or floor it overlaps, and bounce it (`restitution`, `friction`). A real hit on a peg, cap, or bump adds a random sideways kick of up to `jitter`; a hit on a peg also counts toward `pegHits` and emits a `pegHit` event.
-3. **Roll off round things.** A chip resting on a peg, cap, bump, or settled chip, rather than hitting it, gets a small push away from its center. Resting on something round is an unstable balance, and this is also how chips spill off an overflowing pile into the next slot.
+3. **Roll off round things.** A chip resting on a peg, cap, bump, or settled chip, rather than hitting it, gets a small push away from its center. A contact counts as resting if it's slower than 1 unit/s, or, at gravity above 96, slower than 1.25 steps' worth of gravity, so a resting chip isn't hit every step. Resting on something round is an unstable balance, and this is also how chips spill off an overflowing pile into the next slot.
 4. **Collide chips with each other**, if `chipCollisions` is on, as equal-mass circles.
 5. **Check for rest**, below.
 

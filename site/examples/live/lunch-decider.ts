@@ -24,8 +24,8 @@ export function mount(target: HTMLElement, output: HTMLElement) {
     autoReload: false,
     // Names on each slot's back wall, so eight fit without slanting.
     slotLabels: { layout: 'backboard' },
-    // Rigged: pizza wins about a third of the time, not 1 in 8.
-    physics: { bias: { pizza: 8 } },
+    // Rigged: pizza wins about two lunches in three, not 1 in 8.
+    physics: { bias: { pizza: 20 } },
     onLand: ({ slot }) => {
       lunches += 1;
       picks.set(slot.label, (picks.get(slot.label) ?? 0) + 1);

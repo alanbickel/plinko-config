@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildLayout } from './layout';
-import { resolveCoreOptions } from './options';
+import { DEFAULT_PHYSICS, resolveCoreOptions } from './options';
 import type { BoardConfig, PhysicsConfig } from './types';
 import {
   type ChipBody,
@@ -57,6 +57,16 @@ function* positions(n: number, seed = 99): Generator<number> {
     s = (Math.imul(s, 1103515245) + 12345) >>> 0;
     yield s / 2 ** 32;
   }
+}
+
+/** Eight slots and six rows, like the Examples page's lunch decider, weighting slot s2. */
+function biasedWorld(weight: number, gravity = DEFAULT_PHYSICS.gravity): World {
+  return makeWorld({
+    slots: 8,
+    board: { rows: 6 },
+    keepLanded: false,
+    physics: { gravity, bias: { s2: weight } },
+  });
 }
 
 function histogram(world: World, xs: Iterable<number>): number[] {
@@ -184,6 +194,40 @@ describe('World: distribution', () => {
     const plain = histogram(makeWorld({ keepLanded: false }), xs);
     const biased = histogram(makeWorld({ keepLanded: false, physics: { bias: { s1: 4 } } }), xs);
     expect(biased[1] ?? 0).toBeGreaterThan((plain[1] ?? 0) * 1.3);
+  });
+
+  it.each([DEFAULT_PHYSICS.gravity, 20])(
+    'heavier bias weights land more chips in the slot, without overshooting or stalling (gravity %d)',
+    (gravity) => {
+      const xs = [...positions(400)];
+      const runs = [4, 20, 100, 1000].map((weight) => histogram(biasedWorld(weight, gravity), xs));
+      const [w4 = 0, w20 = 0, w100 = 0, w1000 = 0] = runs.map((c) => (c[2] ?? 0) / xs.length);
+      expect(w20).toBeGreaterThan(w4 + 0.2);
+      expect(w100).toBeGreaterThan(w20);
+      expect(w100).toBeGreaterThan(0.9);
+      expect(w1000).toBeGreaterThanOrEqual(w100);
+      expect(w1000).toBeGreaterThan(0.95);
+      expect(runs.map((c) => c.reduce((a, b) => a + b))).toEqual(runs.map(() => xs.length));
+    },
+  );
+
+  it('heavy bias weights still land chips at high gravity, without stalling them on pegs', () => {
+    // One step of gravity 300 tops HIT_SPEED, so a chip resting on a peg must still count as
+    // rolling; otherwise the pull holds it balanced there.
+    const xs = [...positions(400)];
+    const runs = [20, 100, 1000].map((weight) => histogram(biasedWorld(weight, 300), xs));
+    const [w20 = 0, w100 = 0, w1000 = 0] = runs.map((c) => (c[2] ?? 0) / xs.length);
+    expect(w100).toBeGreaterThan(w20);
+    expect(w1000).toBeGreaterThan(w100);
+    expect(w1000).toBeGreaterThan(0.9);
+    expect(runs.map((c) => c.reduce((a, b) => a + b))).toEqual(runs.map(() => xs.length));
+  });
+
+  it('heavy bias barely slows the fall: chips settle in rather than hover', () => {
+    const xs = [...positions(400)];
+    const meanFall = (world: World) =>
+      xs.reduce((sum, x) => sum + dropOne(world, x).chip.ageSteps, 0) / xs.length;
+    expect(meanFall(biasedWorld(100))).toBeLessThan(meanFall(biasedWorld(1)) * 1.2);
   });
 });
 
