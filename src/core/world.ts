@@ -25,6 +25,12 @@ const MAX_NUDGES = 3;
 const MAX_AGE_STEPS = 60 / STEP;
 /** Impacts slower than this (units/s) are contact, not hits: no event, no jitter. */
 const HIT_SPEED = 1;
+/**
+ * Resting on a peg, a chip gains one step of gravity before each contact. When that alone tops
+ * HIT_SPEED (gravity above 96), the contact threshold rises to this many steps of gravity, so a
+ * resting chip still counts as rolling instead of being hit every step.
+ */
+const CONTACT_GRAVITY_STEPS = 1.25;
 /** Sideways push while resting on a peg, rail cap, wall bump, or piled chip, units/s². */
 const ROLL_OFF_ACCEL = 6;
 /** Peak horizontal pull per unit of bias pull (a slot's width from its center), units/s². */
@@ -270,7 +276,7 @@ export class World {
     if (!push) return;
     if (circle.kind === 'chip' && push.y < 0) chip.onPile = true; // pushed up: resting on top
     const impact = this.resolve(chip, push);
-    if (impact <= HIT_SPEED) {
+    if (impact <= Math.max(HIT_SPEED, CONTACT_GRAVITY_STEPS * this.physics.gravity * STEP)) {
       this.rollOff(chip, circle);
       return;
     }

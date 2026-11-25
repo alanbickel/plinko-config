@@ -211,6 +211,18 @@ describe('World: distribution', () => {
     },
   );
 
+  it('heavy bias weights still land chips at high gravity, without stalling them on pegs', () => {
+    // One step of gravity 300 tops HIT_SPEED, so a chip resting on a peg must still count as
+    // rolling; otherwise the pull holds it balanced there.
+    const xs = [...positions(400)];
+    const runs = [20, 100, 1000].map((weight) => histogram(biasedWorld(weight, 300), xs));
+    const [w20 = 0, w100 = 0, w1000 = 0] = runs.map((c) => (c[2] ?? 0) / xs.length);
+    expect(w100).toBeGreaterThan(w20);
+    expect(w1000).toBeGreaterThan(w100);
+    expect(w1000).toBeGreaterThan(0.9);
+    expect(runs.map((c) => c.reduce((a, b) => a + b))).toEqual(runs.map(() => xs.length));
+  });
+
   it('heavy bias barely slows the fall: chips settle in rather than hover', () => {
     const xs = [...positions(400)];
     const meanFall = (world: World) =>

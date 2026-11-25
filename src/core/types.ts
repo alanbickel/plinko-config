@@ -126,7 +126,8 @@ export interface PhysicsConfig {
    * diminishing returns, and the strongest pull scales with `gravity`. On an 8-slot, 6-row board
    * at the default gravity, a weight of 4 about doubles a slot's share, 20 lands about two chips
    * in three there, and 100 nearly all. Lower gravity gives the pull more time, so the same weight
-   * lands more.
+   * lands more; at several times the default gravity, chips fall at `maxSpeed` and the same weight
+   * lands fewer.
    */
   bias?: Record<string, number>;
 }
